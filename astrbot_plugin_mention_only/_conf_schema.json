@@ -1,0 +1,12 @@
+{
+  "active_reply_percent": {
+    "description": "Chance to join each ordinary QQ group message, from 0 to 30 percent.",
+    "type": "float",
+    "default": 5,
+    "slider": {
+      "min": 0,
+      "max": 30,
+      "step": 1
+    }
+  }
+}

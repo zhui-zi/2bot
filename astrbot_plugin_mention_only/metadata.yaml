@@ -1,0 +1,10 @@
+name: mention_only_chat
+display_name: Mention Only Chat
+desc: Gates direct chat and occasionally joins QQ group conversations.
+version: v1.1.1
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.17,<5"

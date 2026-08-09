@@ -1,0 +1,10 @@
+name: ardbert_worldbook
+display_name: Ardbert Worldbook
+desc: Injects topic-relevant Ardbert lore into QQ Official and SnowLuma LLM conversations.
+version: v1.1.0
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.24,<5"

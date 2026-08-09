@@ -1,0 +1,52 @@
+{
+  "classifier_enabled": {
+    "description": "Use the Flash model for ambiguous intent and security classification.",
+    "type": "bool",
+    "default": true
+  },
+  "flash_provider_id": {
+    "description": "AstrBot provider ID used by the front classifier.",
+    "type": "string",
+    "default": "deepseek_v4_flash"
+  },
+  "classifier_timeout_seconds": {
+    "description": "Maximum time allowed for a Flash classification request.",
+    "type": "float",
+    "default": 8
+  },
+  "command_min_confidence": {
+    "description": "Minimum Flash confidence required to route a natural command.",
+    "type": "float",
+    "default": 0.78
+  },
+  "security_min_confidence": {
+    "description": "Minimum Flash confidence required to block ambiguous harassment or injection.",
+    "type": "float",
+    "default": 0.88
+  },
+  "security_reply_timeout_seconds": {
+    "description": "Maximum time allowed for a Flash-generated security reply.",
+    "type": "float",
+    "default": 8
+  },
+  "security_reply_temperature": {
+    "description": "Sampling temperature for varied Flash-generated security replies.",
+    "type": "float",
+    "default": 0.9
+  },
+  "security_reply_max_tokens": {
+    "description": "Maximum output tokens for a Flash-generated security reply.",
+    "type": "int",
+    "default": 96
+  },
+  "cache_ttl_seconds": {
+    "description": "Classification cache lifetime for repeated identical messages.",
+    "type": "float",
+    "default": 300
+  },
+  "cache_max_entries": {
+    "description": "Maximum number of hashed classification cache entries.",
+    "type": "int",
+    "default": 256
+  }
+}

@@ -1,0 +1,10 @@
+name: unified_front_guard
+display_name: Unified Front Guard
+desc: Routes user features and protects model requests through a Flash front layer.
+version: v1.1.1
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.23.1,<5"

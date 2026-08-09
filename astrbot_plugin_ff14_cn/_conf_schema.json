@@ -1,0 +1,42 @@
+{
+  "rss_url": {
+    "description": "RSSHub FF14 CN aggregate feed URL.",
+    "type": "string",
+    "default": "http://rsshub:1200/ff14/zh/all"
+  },
+  "news_poll_seconds": {
+    "description": "News feed polling interval in seconds.",
+    "type": "int",
+    "default": 300
+  },
+  "battlefield_hour": {
+    "description": "Daily battlefield notification hour in Asia/Shanghai.",
+    "type": "int",
+    "default": 23
+  },
+  "bot_author_ids": {
+    "description": "QQ sender IDs granted the highest permission tier.",
+    "type": "list",
+    "default": []
+  },
+  "manager_openids": {
+    "description": "QQ group member OpenIDs allowed to change group settings.",
+    "type": "list",
+    "default": []
+  },
+  "max_news_per_poll": {
+    "description": "Maximum new entries sent to each subscription per poll.",
+    "type": "int",
+    "default": 5
+  },
+  "request_timeout_seconds": {
+    "description": "RSS request timeout in seconds.",
+    "type": "int",
+    "default": 20
+  },
+  "startup_delay_seconds": {
+    "description": "Scheduler startup delay in seconds.",
+    "type": "int",
+    "default": 10
+  }
+}

@@ -1,0 +1,10 @@
+name: astrbot_plugin_ff14_novice
+display_name: FF14 Novice Knowledge
+desc: Answers FF14 beginner and duty questions with a local knowledge index.
+version: v1.2.0
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.23.1,<5"

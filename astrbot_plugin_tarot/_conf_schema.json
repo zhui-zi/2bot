@@ -1,0 +1,12 @@
+{
+  "cooldown_seconds": {
+    "description": "Per-user reading cooldown in seconds.",
+    "type": "int",
+    "default": 60
+  },
+  "max_question_chars": {
+    "description": "Maximum question length.",
+    "type": "int",
+    "default": 200
+  }
+}

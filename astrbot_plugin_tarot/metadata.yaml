@@ -1,0 +1,10 @@
+name: tarot_reading
+display_name: Tarot Reading
+desc: Three-card Major Arcana readings for reflection and entertainment.
+version: v1.3.0
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.17,<5"

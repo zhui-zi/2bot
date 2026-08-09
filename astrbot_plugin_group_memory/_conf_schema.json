@@ -1,0 +1,47 @@
+{
+  "manager_ids": {
+    "description": "QQ sender IDs allowed to manage persistent group memory.",
+    "type": "list",
+    "default": []
+  },
+  "max_records_per_group": {
+    "description": "Maximum persistent records stored for each allowlisted group.",
+    "type": "int",
+    "default": 500
+  },
+  "max_age_days": {
+    "description": "Maximum age of persistent group memory records in days.",
+    "type": "int",
+    "default": 180
+  },
+  "max_message_chars": {
+    "description": "Maximum characters stored from each group message or bot reply.",
+    "type": "int",
+    "default": 600
+  },
+  "max_relevant_records": {
+    "description": "Maximum relevant historical records injected into each LLM request.",
+    "type": "int",
+    "default": 6
+  },
+  "recent_records": {
+    "description": "Number of recent group records injected for conversational continuity.",
+    "type": "int",
+    "default": 4
+  },
+  "personal_records": {
+    "description": "Number of recent records involving the current member injected alongside shared group context.",
+    "type": "int",
+    "default": 2
+  },
+  "max_roster_members": {
+    "description": "Maximum recently observed group members included in the nickname roster.",
+    "type": "int",
+    "default": 30
+  },
+  "max_injected_chars": {
+    "description": "Maximum persistent-memory characters injected into each LLM request.",
+    "type": "int",
+    "default": 5000
+  }
+}

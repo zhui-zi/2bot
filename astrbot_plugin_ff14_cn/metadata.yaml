@@ -1,0 +1,10 @@
+name: ff14_cn_push
+display_name: FF14 CN Push
+desc: QQ Official and SnowLuma FF14 CN news and Frontline notifications.
+version: v1.1.3
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.17,<5"
