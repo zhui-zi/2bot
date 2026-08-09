@@ -34,6 +34,7 @@ from .front_core import (
     clean_security_reply,
     is_harassing_message,
     is_natural_system_request,
+    is_pvp_gameplay_question,
     is_prompt_injection,
     match_natural_command,
     parse_classifier_output,
@@ -47,7 +48,7 @@ DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.3.0",
+    "1.3.2",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -115,6 +116,9 @@ class UnifiedFrontGuard(Star):
         if is_natural_system_request(message):
             yield event.plain_result(SYSTEM_COMMAND_REPLY)
             event.stop_event()
+            return
+        if is_pvp_gameplay_question(message):
+            event.set_extra("_front_guard_checked", "local")
             return
 
         intent = match_natural_command(message)

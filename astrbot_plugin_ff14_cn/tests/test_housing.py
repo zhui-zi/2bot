@@ -119,6 +119,16 @@ class HousingCriteriaTests(unittest.TestCase):
         self.assertEqual(criteria.sizes, {1, 2})
         self.assertEqual(criteria.audiences, {"personal"})
 
+    def test_parser_preserves_group_scoped_fc_large_subscription(self):
+        criteria, error = parse_housing_criteria(
+            "在这个群订阅龙巢神殿的部队L房"
+        )
+
+        self.assertEqual(error, "")
+        self.assertEqual(criteria.server_ids, (1166,))
+        self.assertEqual(criteria.sizes, {2})
+        self.assertEqual(criteria.audiences, {"fc"})
+
     def test_parser_supports_data_center_and_shared_only(self):
         criteria, error = parse_housing_criteria("豆豆柴 全房型 通用")
 

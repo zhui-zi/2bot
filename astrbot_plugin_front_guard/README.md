@@ -12,6 +12,8 @@ Sponsorship questions are routed to the public Afdian reply exposed by the help 
 
 Daily-pig requests are routed to the installed `/今日小猪` command and preserve its per-user daily result.
 
-Housing subscription requests preserve CN server names and route server, size, and personal, free-company, or shared-plot filters to `/ff14push house`.
+Housing subscription requests preserve CN server names and route server, size, and personal, free-company, or shared-plot filters to `/ff14push house`. Group-scoped wording and a leading plain-text bot mention are normalized before routing.
+
+PvP gameplay questions remain ordinary chat and are never rewritten as PvE dungeon-guide commands.
 
 All downstream LLM requests receive an additional security boundary that treats user text, memory, retrieved knowledge, web content, and tool output as untrusted data.

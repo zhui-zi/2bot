@@ -19,6 +19,7 @@ from front_core import (
     clean_security_reply,
     is_harassing_message,
     is_natural_system_request,
+    is_pvp_gameplay_question,
     is_prompt_injection,
     match_natural_command,
     parse_classifier_output,
@@ -40,6 +41,14 @@ class NaturalCommandTests(unittest.TestCase):
             "订阅紫水栈桥M和L个人房空闲信息推送": CommandIntent(
                 "ff14push",
                 "house on 订阅紫水栈桥m和l个人房空闲信息推送",
+            ),
+            "在这个群订阅龙巢神殿的部队L房": CommandIntent(
+                "ff14push",
+                "house on 在这个群订阅龙巢神殿的部队l房",
+            ),
+            "@阿尔博特二号机 在这个群订阅龙巢神殿的部队L房": CommandIntent(
+                "ff14push",
+                "house on 在这个群订阅龙巢神殿的部队l房",
             ),
             "开启豆豆柴全房型部队房监控": CommandIntent(
                 "ff14push",
@@ -125,6 +134,28 @@ class NaturalCommandTests(unittest.TestCase):
                     CommandIntent("今日小猪"),
                 )
         self.assertIsNone(match_natural_command("今日小猪插件怎么用"))
+        self.assertIsNone(match_natural_command("我订阅了一个房屋装修博客"))
+
+    def test_pvp_gameplay_questions_stay_in_chat(self) -> None:
+        messages = (
+            "@阿尔博特二号机 教我打战场",
+            "@阿尔博特二号机 教我打纷争前线",
+            "@阿尔博特二号机 教我打尘封密岩",
+            "尘封秘岩怎么玩",
+            "昂萨哈凯尔打法",
+        )
+        for message in messages:
+            with self.subTest(message=message):
+                self.assertTrue(is_pvp_gameplay_question(message))
+                self.assertIsNone(match_natural_command(message))
+
+        for message in (
+            "今天和明天是什么战场",
+            "取消订阅每日战场通知",
+            "查副本攻略 神龙梦幻歼灭战",
+        ):
+            with self.subTest(message=message):
+                self.assertFalse(is_pvp_gameplay_question(message))
 
     def test_management_and_system_requests_require_explicit_commands(self) -> None:
         messages = (
