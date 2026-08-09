@@ -23,7 +23,10 @@ class FrontClassification:
 ROUTED_COMMANDS = frozenset(
     {
         "help",
+        "source",
+        "sponsor",
         "tarot",
+        "今日小猪",
         "ff14push",
         "groupmemory",
         "暖暖",
@@ -73,8 +76,11 @@ Classify the intended action by meaning even when the wording does not contain a
 
 Allowed natural-language commands:
 - help: ask what the bot can do or request its feature list
+- source: ask for the bot's public source, GitHub repository, or project URL; no arguments
+- sponsor: ask for the bot's sponsorship or Afdian URL; no arguments
 - tarot: request fortune telling or tarot; arguments are the question, blank means today's fortune
-- ff14push: news on/off, pvp on/off, status, or today
+- 今日小猪: draw or view the user's pig for today; no arguments
+- ff14push: news on/off, pvp on/off, status, today, or housing subscriptions. Housing arguments must be `house on <CN server or data center> <S/M/L or all> <personal/FC/shared/all>`, `house off`, or `house now [filters]`. Preserve Chinese server names and normalize only the action and filter labels.
 - groupmemory: status only; clearing memory is system_request
 - 暖暖, 选门, 仙人彩, 看看微博, 抽卡: no arguments
 - 日历: optional 国服 or 国际服
@@ -310,7 +316,16 @@ def match_natural_command(message: str) -> CommandIntent | None:
     intent = _match_help(text)
     if intent:
         return intent
+    intent = _match_source(text)
+    if intent:
+        return intent
+    intent = _match_sponsor(text)
+    if intent:
+        return intent
     intent = _match_tarot(text)
+    if intent:
+        return intent
+    intent = _match_daily_pig(text)
     if intent:
         return intent
     intent = _match_push(text)
@@ -340,6 +355,70 @@ def _match_help(text: str) -> CommandIntent | None:
     return None
 
 
+def _match_source(text: str) -> CommandIntent | None:
+    compact = re.sub(r"\s+", "", text)
+    if compact in {
+        "开源",
+        "开源地址",
+        "开源项目",
+        "开源项目地址",
+        "源码",
+        "源码地址",
+        "源代码",
+        "源代码地址",
+        "github",
+        "github地址",
+        "github仓库",
+        "项目地址",
+        "项目链接",
+        "项目仓库",
+        "代码仓库",
+        "代码仓库在哪里",
+        "机器人项目地址",
+        "机器人的开源地址",
+        "机器人的源码",
+        "机器人的github",
+        "这个机器人的项目地址",
+        "这个机器人开源吗",
+        "源码在哪里",
+        "你的源码",
+        "你的源码在哪里",
+        "你的代码在哪",
+        "你的github",
+        "你的github在哪里",
+        "开源项目在哪里",
+        "github仓库在哪里",
+        "你开源吗",
+    }:
+        return CommandIntent("source")
+    return None
+
+
+def _match_sponsor(text: str) -> CommandIntent | None:
+    compact = re.sub(r"\s+", "", text)
+    if compact in {
+        "赞助",
+        "赞助地址",
+        "赞助链接",
+        "爱发电",
+        "爱发电地址",
+        "爱发电链接",
+        "怎么赞助",
+        "如何赞助",
+        "在哪里赞助",
+        "我想赞助",
+        "我想支持你",
+        "支持作者",
+        "支持机器人",
+        "机器人的赞助地址",
+        "这个机器人的赞助地址",
+        "你的爱发电",
+        "你的赞助地址",
+    }:
+        return CommandIntent("sponsor")
+    return None
+
+
 def _match_tarot(text: str) -> CommandIntent | None:
     for pattern in _TAROT_PATTERNS:
         match = pattern.fullmatch(text)
@@ -352,7 +431,54 @@ def _match_tarot(text: str) -> CommandIntent | None:
     return None
 
 
+def _match_daily_pig(text: str) -> CommandIntent | None:
+    compact = re.sub(r"\s+", "", text)
+    if compact in {
+        "今日小猪",
+        "抽小猪",
+        "我的小猪",
+        "看看我的小猪",
+        "查看我的小猪",
+        "抽一下今日小猪",
+        "抽取今日小猪",
+        "帮我抽个小猪",
+        "帮我抽一个小猪",
+        "今天的小猪",
+        "今天是什么小猪",
+        "今天是啥小猪",
+        "我今天是什么小猪",
+        "我今天是啥小猪",
+    }:
+        return CommandIntent("今日小猪")
+    return None
+
+
 def _match_push(text: str) -> CommandIntent | None:
+    housing_on = re.fullmatch(
+        rf"{_LEADING_POLITENESS}(?:我想|我要)?"
+        r"(?:开启|打开|启用|订阅|监控)(?:一下)?"
+        r"(?=.*(?:房|住宅))(?=.*(?:推送|通知|提醒|信息|监控)).+",
+        text,
+        re.I,
+    )
+    if housing_on:
+        return CommandIntent("ff14push", f"house on {text}")
+    if re.fullmatch(
+        rf"{_LEADING_POLITENESS}(?:关闭|关掉|停用|取消|取消订阅|停止)(?:一下)?"
+        r"(?:国服)?(?:空闲|空置|可抽选)?(?:房屋|房区|住宅|空房)"
+        r"(?:信息)?(?:推送|通知|提醒|监控)",
+        text,
+        re.I,
+    ):
+        return CommandIntent("ff14push", "house off")
+    if re.fullmatch(
+        rf"{_LEADING_POLITENESS}(?:{_LOOKUP_VERB}|告诉我)(?:一下)?"
+        r"(?=.*(?:空闲|空置|可抽选|本轮|当前))(?=.*(?:房|住宅)).+",
+        text,
+        re.I,
+    ):
+        return CommandIntent("ff14push", f"house now {text}")
+
     action_patterns = (
         ("off", r"(?:关闭|关掉|停用|取消|取消订阅|停止)(?:一下)?"),
         ("on", r"(?:开启|打开|启用|订阅)(?:一下)?"),
@@ -546,7 +672,8 @@ def _match_parameterized_features(text: str) -> CommandIntent | None:
             "logs",
             (
                 rf"{_LEADING_POLITENESS}{_LOOKUP_VERB}(?:一下)?(?:角色)?(?:logs|fflogs)(?:战绩)?[：: ]+(?P<args>.+)",
-                rf"{_LEADING_POLITENESS}{_LOOKUP_VERB}(?:一下)?(?P<args>.+?)(?:的)?(?:logs|fflogs)(?:战绩|成绩|记录)?",
+                rf"{_LEADING_POLITENESS}{_LOOKUP_VERB}(?:一下)?(?P<args>.+?)的\s*(?:logs|fflogs)(?:战绩|成绩|记录)?",
+                rf"{_LEADING_POLITENESS}{_LOOKUP_VERB}(?:一下)?(?P<args>.+?)(?:logs|fflogs)(?:战绩|成绩|记录)?",
             ),
         ),
     )

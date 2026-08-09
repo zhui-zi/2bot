@@ -34,9 +34,14 @@ BATTLEFIELD_ROTATION = (
 SUBSCRIPTION_DEFAULTS = {
     "news": False,
     "pvp": False,
+    "house": False,
     "news_initialized": False,
     "news_seen": [],
     "battlefield_last_date": "",
+    "house_servers": [],
+    "house_sizes": [0, 1, 2],
+    "house_audiences": ["personal", "fc"],
+    "house_server_cycles": {},
 }
 
 
@@ -111,9 +116,20 @@ def normalize_subscription(
         current["group_id"] = target_id
         current.pop("user_id", None)
     for key, value in SUBSCRIPTION_DEFAULTS.items():
-        current.setdefault(key, value.copy() if isinstance(value, list) else value)
+        current.setdefault(
+            key,
+            value.copy() if isinstance(value, (list, dict)) else value,
+        )
     if not isinstance(current.get("news_seen"), list):
         current["news_seen"] = []
+    if not isinstance(current.get("house_servers"), list):
+        current["house_servers"] = []
+    if not isinstance(current.get("house_sizes"), list):
+        current["house_sizes"] = [0, 1, 2]
+    if not isinstance(current.get("house_audiences"), list):
+        current["house_audiences"] = ["personal", "fc"]
+    if not isinstance(current.get("house_server_cycles"), dict):
+        current["house_server_cycles"] = {}
     return current
 
 

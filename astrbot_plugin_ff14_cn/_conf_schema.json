@@ -9,6 +9,26 @@
     "type": "int",
     "default": 300
   },
+  "housing_api_base_url": {
+    "description": "Housing data API base URL.",
+    "type": "string",
+    "default": "https://house.ffxiv.cyou/api"
+  },
+  "housing_poll_seconds": {
+    "description": "Housing cycle polling interval in seconds; values below 300 are clamped.",
+    "type": "int",
+    "default": 600
+  },
+  "housing_stale_hours": {
+    "description": "Exclude housing records not refreshed within this many hours.",
+    "type": "int",
+    "default": 24
+  },
+  "max_houses_per_message": {
+    "description": "Maximum housing entries expanded in each server update.",
+    "type": "int",
+    "default": 30
+  },
   "battlefield_hour": {
     "description": "Daily battlefield notification hour in Asia/Shanghai.",
     "type": "int",

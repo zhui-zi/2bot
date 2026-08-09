@@ -29,11 +29,27 @@ class NaturalCommandTests(unittest.TestCase):
     def test_routes_every_user_facing_command_family(self) -> None:
         cases = {
             "你有什么功能": CommandIntent("help"),
+            "机器人的开源地址": CommandIntent("source"),
+            "机器人的赞助地址": CommandIntent("sponsor"),
             "占卜一下我这周的运势": CommandIntent("tarot", "我这周的运势"),
+            "看看我的小猪": CommandIntent("今日小猪"),
             "请开启国服新闻推送": CommandIntent("ff14push", "news on"),
             "取消订阅每日战场通知": CommandIntent("ff14push", "pvp off"),
             "查看当前推送状态": CommandIntent("ff14push", "status"),
             "今天和明天是什么战场": CommandIntent("ff14push", "today"),
+            "订阅紫水栈桥M和L个人房空闲信息推送": CommandIntent(
+                "ff14push",
+                "house on 订阅紫水栈桥m和l个人房空闲信息推送",
+            ),
+            "开启豆豆柴全房型部队房监控": CommandIntent(
+                "ff14push",
+                "house on 开启豆豆柴全房型部队房监控",
+            ),
+            "关闭空闲房区推送": CommandIntent("ff14push", "house off"),
+            "查询本轮紫水栈桥M个人空房": CommandIntent(
+                "ff14push",
+                "house now 查询本轮紫水栈桥m个人空房",
+            ),
             "看看这个群记住了多少内容": CommandIntent("groupmemory", "status"),
             "本周时尚品鉴怎么搭配": CommandIntent("暖暖"),
             "帮我选藏宝洞的门": CommandIntent("选门"),
@@ -69,10 +85,46 @@ class NaturalCommandTests(unittest.TestCase):
             "查询光之战士 陆行鸟的fflogs战绩": CommandIntent(
                 "logs", "光之战士 陆行鸟"
             ),
+            "查波奇拂晓之间的 logs": CommandIntent("logs", "波奇拂晓之间"),
+            "查一下拂晓之间波奇的logs": CommandIntent("logs", "拂晓之间波奇"),
         }
         for message, expected in cases.items():
             with self.subTest(message=message):
                 self.assertEqual(match_natural_command(message), expected)
+
+    def test_routes_common_source_repository_questions(self) -> None:
+        for message in (
+            "你的代码在哪",
+            "代码仓库",
+            "项目链接",
+            "这个机器人开源吗",
+        ):
+            with self.subTest(message=message):
+                self.assertEqual(match_natural_command(message), CommandIntent("source"))
+
+    def test_routes_common_sponsorship_questions(self) -> None:
+        for message in (
+            "怎么赞助",
+            "爱发电地址",
+            "我想支持你",
+            "这个机器人的赞助地址",
+        ):
+            with self.subTest(message=message):
+                self.assertEqual(match_natural_command(message), CommandIntent("sponsor"))
+
+    def test_routes_daily_pig_requests_without_matching_discussion(self) -> None:
+        for message in (
+            "今日小猪",
+            "抽一下今日小猪",
+            "今天是什么小猪",
+            "帮我抽个小猪",
+        ):
+            with self.subTest(message=message):
+                self.assertEqual(
+                    match_natural_command(message),
+                    CommandIntent("今日小猪"),
+                )
+        self.assertIsNone(match_natural_command("今日小猪插件怎么用"))
 
     def test_management_and_system_requests_require_explicit_commands(self) -> None:
         messages = (
@@ -161,6 +213,36 @@ class NaturalCommandTests(unittest.TestCase):
                 '"arguments":"clear","confidence":0.99}'
             ),
             FrontClassification("system_request", confidence=0.99),
+        )
+        self.assertEqual(
+            classification_intent(
+                parse_classifier_output(
+                    '{"kind":"command","command":"source",'
+                    '"arguments":"","confidence":0.99}'
+                ),
+                0.8,
+            ),
+            CommandIntent("source"),
+        )
+        self.assertEqual(
+            classification_intent(
+                parse_classifier_output(
+                    '{"kind":"command","command":"sponsor",'
+                    '"arguments":"","confidence":0.99}'
+                ),
+                0.8,
+            ),
+            CommandIntent("sponsor"),
+        )
+        self.assertEqual(
+            classification_intent(
+                parse_classifier_output(
+                    '{"kind":"command","command":"今日小猪",'
+                    '"arguments":"","confidence":0.99}'
+                ),
+                0.8,
+            ),
+            CommandIntent("今日小猪"),
         )
         self.assertIsNone(
             parse_classifier_output(

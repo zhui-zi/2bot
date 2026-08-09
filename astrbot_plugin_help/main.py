@@ -8,18 +8,34 @@ from astrbot.core.config.default import VERSION
 from astrbot.core.dashboard_assets import get_dashboard_version
 from astrbot.core.star import command_management
 
-from .help_text import CommandInfo, build_help_text, is_help_request
+from .help_text import (
+    CommandInfo,
+    build_help_text,
+    build_source_text,
+    build_sponsor_text,
+    is_help_request,
+)
 
 
 @register(
     "complete_help",
     "keita",
     "Replaces the built-in help output with concise Chinese command guidance.",
-    "1.3.0",
+    "1.5.0",
 )
 class CompleteHelp(Star):
     def __init__(self, context: Context):
         super().__init__(context)
+
+    @filter.command("source", alias={"开源", "源码"})
+    async def source(self, event: AstrMessageEvent):
+        """Show the public source repository."""
+        yield event.plain_result(build_source_text())
+
+    @filter.command("sponsor", alias={"赞助", "爱发电"})
+    async def sponsor(self, event: AstrMessageEvent):
+        """Show the sponsorship page."""
+        yield event.plain_result(build_sponsor_text())
 
     @filter.on_decorating_result(priority=100)
     async def replace_help_result(self, event: AstrMessageEvent) -> None:

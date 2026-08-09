@@ -9,6 +9,7 @@ import httpx
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.star.filter.command import GreedyStr
 
 from .ff14_utils import (
     FeedItem,
@@ -21,6 +22,16 @@ from .ff14_utils import (
     resolve_permission_rank,
     resolve_qq_scene,
 )
+from .housing import (
+    HousingCriteria,
+    criteria_from_subscription,
+    criteria_text,
+    house_matches,
+    lottery_cycle,
+    parse_house,
+    parse_housing_criteria,
+    render_housing_message,
+)
 
 
 STATE_KEY = "state_v1"
@@ -30,7 +41,7 @@ STATE_KEY = "state_v1"
     "ff14_cn_push",
     "keita",
     "QQ Official and SnowLuma FF14 CN notifications.",
-    "1.1.3",
+    "1.2.0",
 )
 class FF14CnPush(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -43,7 +54,12 @@ class FF14CnPush(Star):
         self._client = httpx.AsyncClient(
             follow_redirects=True,
             timeout=float(config.get("request_timeout_seconds", 20)),
-            headers={"User-Agent": "AstrBot-FF14-CN-Push/1.0"},
+            headers={
+                "User-Agent": (
+                    "AstrBot-FF14-CN-Push/1.2 "
+                    "(https://github.com/zhui-zi/2bot)"
+                )
+            },
         )
         self._task = asyncio.create_task(self._run())
 
@@ -53,6 +69,7 @@ class FF14CnPush(Star):
         event: AstrMessageEvent,
         feature: str = "status",
         action: str = "",
+        details: GreedyStr = "",
     ):
         """Manage FF14 CN group or private notifications."""
         await self._ensure_state()
@@ -75,13 +92,24 @@ class FF14CnPush(Star):
         if feature in {"today", "今日", "战场"} and not action:
             yield event.plain_result(self._battlefield_text(datetime.now(SHANGHAI_TZ)))
             return
+        if feature in {"house", "housing", "房屋", "房区", "空房"}:
+            async for result in self._handle_housing_command(
+                event,
+                scene,
+                target_id,
+                action,
+                str(details),
+            ):
+                yield result
+            return
 
         normalized_feature = self._normalize_feature(feature)
         normalized_action = self._normalize_action(action)
         if not normalized_feature or not normalized_action:
             yield event.plain_result(
                 "用法：/ff14push news on|off，/ff14push pvp on|off，"
-                "/ff14push status，/ff14push today"
+                "/ff14push house on <服务器> [S|M|L] [个人|部队|通用|全部]，"
+                "/ff14push house off|now，/ff14push status，/ff14push today"
             )
             return
         if scene == "group" and not self._is_manager(event):
@@ -113,13 +141,24 @@ class FF14CnPush(Star):
             delay = max(0, int(self.config.get("startup_delay_seconds", 10)))
             await asyncio.sleep(delay)
             last_news_poll = 0.0
+            last_house_poll = 0.0
             loop = asyncio.get_running_loop()
             while not self._stopping.is_set():
                 now = datetime.now(SHANGHAI_TZ)
-                interval = max(60, int(self.config.get("news_poll_seconds", 300)))
-                if loop.time() - last_news_poll >= interval:
+                news_interval = max(
+                    60,
+                    int(self.config.get("news_poll_seconds", 300)),
+                )
+                if loop.time() - last_news_poll >= news_interval:
                     await self._poll_news()
                     last_news_poll = loop.time()
+                house_interval = max(
+                    300,
+                    int(self.config.get("housing_poll_seconds", 600)),
+                )
+                if loop.time() - last_house_poll >= house_interval:
+                    await self._poll_housing(now)
+                    last_house_poll = loop.time()
                 await self._push_battlefield_if_due(now)
                 try:
                     await asyncio.wait_for(self._stopping.wait(), timeout=30)
@@ -222,6 +261,235 @@ class FF14CnPush(Star):
         response.raise_for_status()
         return parse_feed(response.text)
 
+    async def _handle_housing_command(
+        self,
+        event: AstrMessageEvent,
+        scene: str,
+        target_id: str,
+        action: str,
+        details: str,
+    ):
+        normalized_action = self._normalize_action(action)
+        if action.lower().strip() in {"now", "current", "当前", "本轮", "查询"}:
+            subscription = self._state.get("subscriptions", {}).get(
+                event.unified_msg_origin,
+                {},
+            )
+            criteria = criteria_from_subscription(subscription)
+            if details.strip():
+                criteria, error = parse_housing_criteria(details)
+                if error:
+                    yield event.plain_result(error)
+                    return
+            if criteria is None:
+                yield event.plain_result(
+                    "当前会话尚未配置房屋筛选。请先使用 "
+                    "/ff14push house on <服务器> [S|M|L] [个人|部队|通用|全部]。"
+                )
+                return
+            async for result in self._current_housing_results(event, criteria):
+                yield result
+            return
+
+        if normalized_action not in {"on", "off"}:
+            yield event.plain_result(
+                "用法：/ff14push house on <服务器> [S|M|L] "
+                "[个人|部队|通用|全部]，或 /ff14push house off|now"
+            )
+            return
+        if scene == "group" and not self._is_manager(event):
+            yield event.plain_result(
+                "仅群主或管理员可修改推送设置。QQ 官方群消息若未提供身份字段，"
+                "请让机器人维护者把你的 /sid 标识加入 AstrBot 管理员或插件 manager_openids。"
+            )
+            return
+
+        umo = event.unified_msg_origin
+        if normalized_action == "off":
+            async with self._state_lock:
+                subscription = self._subscription(umo, target_id, scene)
+                subscription["house"] = False
+                await self._save_state()
+            yield event.plain_result("国服空闲房区推送已关闭。")
+            return
+
+        criteria, error = parse_housing_criteria(details)
+        if error or criteria is None:
+            yield event.plain_result(error)
+            return
+        cycle_key, _state, _start, _end = lottery_cycle(datetime.now(SHANGHAI_TZ))
+        async with self._state_lock:
+            subscription = self._subscription(umo, target_id, scene)
+            subscription["house"] = True
+            subscription["house_servers"] = list(criteria.server_ids)
+            subscription["house_sizes"] = sorted(criteria.sizes)
+            subscription["house_audiences"] = sorted(criteria.audiences)
+            subscription["house_server_cycles"] = {
+                str(server_id): cycle_key for server_id in criteria.server_ids
+            }
+            await self._save_state()
+        yield event.plain_result(
+            "国服空闲房区推送已开启。\n"
+            + criteria_text(criteria)
+            + "\n将在下一轮申请期开始后推送；使用 /ff14push house now 可立即查询。"
+        )
+
+    async def _current_housing_results(
+        self,
+        event: AstrMessageEvent,
+        criteria: HousingCriteria,
+    ):
+        now = datetime.now(SHANGHAI_TZ)
+        for server_id in criteria.server_ids:
+            try:
+                houses, _updated_at = await self._fetch_houses(server_id, now)
+            except Exception as exc:
+                logger.warning("Unable to fetch housing data for %s: %s", server_id, exc)
+                yield event.plain_result(f"服务器 {server_id} 的房屋数据暂时获取失败。")
+                continue
+            yield event.plain_result(
+                self._housing_text(server_id, houses, criteria, now)
+            )
+
+    async def _poll_housing(self, now: datetime) -> None:
+        await self._ensure_state()
+        cycle_key, state, cycle_start, _end = lottery_cycle(now)
+        if state != 1:
+            return
+        async with self._state_lock:
+            targets: list[tuple[str, dict[str, Any], HousingCriteria, list[int]]] = []
+            for umo, subscription in self._state.get("subscriptions", {}).items():
+                if not subscription.get("house"):
+                    continue
+                criteria = criteria_from_subscription(subscription)
+                if criteria is None:
+                    continue
+                sent_cycles = subscription.get("house_server_cycles", {})
+                pending = [
+                    server_id
+                    for server_id in criteria.server_ids
+                    if sent_cycles.get(str(server_id)) != cycle_key
+                ]
+                if pending:
+                    targets.append((umo, subscription, criteria, pending))
+        if not targets:
+            return
+
+        server_ids = sorted(
+            {server_id for _umo, _sub, _criteria, pending in targets for server_id in pending}
+        )
+        fetched: dict[int, list[Any]] = {}
+        for server_id in server_ids:
+            try:
+                houses, updated_at = await self._fetch_houses(server_id, now)
+                if updated_at < cycle_start:
+                    logger.info(
+                        "Housing data for %s has not completed a new-cycle refresh.",
+                        server_id,
+                    )
+                    continue
+                fetched[server_id] = houses
+            except Exception as exc:
+                logger.warning("Unable to fetch housing data for %s: %s", server_id, exc)
+
+        for umo, subscription, criteria, pending in targets:
+            for server_id in pending:
+                if server_id not in fetched:
+                    continue
+                try:
+                    await self._send(
+                        umo,
+                        self._housing_text(
+                            server_id,
+                            fetched[server_id],
+                            criteria,
+                            now,
+                        ),
+                        normalize_scene(subscription.get("scene")),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Unable to send housing update to %s for %s: %s",
+                        umo,
+                        server_id,
+                        exc,
+                    )
+                    continue
+                async with self._state_lock:
+                    cycles = subscription.setdefault("house_server_cycles", {})
+                    cycles[str(server_id)] = cycle_key
+                    await self._save_state()
+
+    async def _fetch_houses(
+        self,
+        server_id: int,
+        now: datetime,
+    ) -> tuple[list[Any], int]:
+        base_url = str(
+            self.config.get("housing_api_base_url", "https://house.ffxiv.cyou/api")
+        ).rstrip("/")
+        cache_key = int(now.timestamp() // 60)
+        sales_response, update_response = await asyncio.gather(
+            self._client.get(
+                f"{base_url}/sales",
+                params={"server": server_id, "ts": cache_key},
+            ),
+            self._client.get(
+                f"{base_url}/update_time",
+                params={"server": server_id, "ts": cache_key},
+            ),
+        )
+        sales_response.raise_for_status()
+        update_response.raise_for_status()
+        payload = sales_response.json()
+        if not isinstance(payload, list):
+            raise ValueError("housing API returned a non-list response")
+        update_payload = update_response.json()
+        if not isinstance(update_payload, dict):
+            raise ValueError("housing update API returned a non-object response")
+        try:
+            updated_at = int(update_payload.get("Time", 0))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("housing update API returned an invalid timestamp") from exc
+        return (
+            [
+                house
+                for item in payload
+                if (house := parse_house(item, now)) is not None
+            ],
+            updated_at,
+        )
+
+    def _housing_text(
+        self,
+        server_id: int,
+        houses: list[Any],
+        criteria: HousingCriteria,
+        now: datetime,
+    ) -> str:
+        stale_seconds = max(
+            3600,
+            min(
+                7 * 86400,
+                int(self.config.get("housing_stale_hours", 24)) * 3600,
+            ),
+        )
+        matches = [
+            house
+            for house in houses
+            if house_matches(house, criteria, now, stale_seconds)
+        ]
+        max_items = max(
+            1,
+            min(100, int(self.config.get("max_houses_per_message", 30))),
+        )
+        return render_housing_message(
+            server_id,
+            matches,
+            criteria,
+            max_items=max_items,
+        )
+
     async def _push_battlefield_if_due(self, now: datetime) -> None:
         push_hour = max(0, min(23, int(self.config.get("battlefield_hour", 23))))
         if now.hour < push_hour:
@@ -258,8 +526,15 @@ class FF14CnPush(Star):
         )
         news = "开启" if subscription.get("news") else "关闭"
         pvp = "开启" if subscription.get("pvp") else "关闭"
+        housing = "关闭"
+        if subscription.get("house"):
+            criteria = criteria_from_subscription(subscription)
+            housing = "开启" + (f"\n  {criteria_text(criteria)}" if criteria else "（配置无效）")
         scope = "当前私聊" if self._event_scene(event) == "friend" else "当前群聊"
-        return f"{scope}订阅\nFF14 国服新闻：{news}\n每日 23:00 战场：{pvp}"
+        return (
+            f"{scope}订阅\nFF14 国服新闻：{news}\n"
+            f"每日 23:00 战场：{pvp}\n国服空闲房区：{housing}"
+        )
 
     async def _send(self, umo: str, text: str, scene: str) -> None:
         self._restore_qq_scene(umo, scene)
@@ -355,6 +630,8 @@ class FF14CnPush(Star):
             return "news"
         if value in {"pvp", "battlefield", "战场"}:
             return "pvp"
+        if value in {"house", "housing", "房屋", "房区", "空房"}:
+            return "house"
         return ""
 
     @staticmethod

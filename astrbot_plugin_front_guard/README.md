@@ -6,4 +6,12 @@ Harassment and prompt-injection blocks use the same Flash provider to generate a
 
 The router preserves the target command's permissions, enabled state, and session-level plugin state. Plugin management, provider configuration, session control, variables, destructive memory operations, and other system or administrator commands remain explicit-command only.
 
+Source-code questions are routed to the public repository reply exposed by the help plugin.
+
+Sponsorship questions are routed to the public Afdian reply exposed by the help plugin.
+
+Daily-pig requests are routed to the installed `/今日小猪` command and preserve its per-user daily result.
+
+Housing subscription requests preserve CN server names and route server, size, and personal, free-company, or shared-plot filters to `/ff14push house`.
+
 All downstream LLM requests receive an additional security boundary that treats user text, memory, retrieved knowledge, web content, and tool output as untrusted data.

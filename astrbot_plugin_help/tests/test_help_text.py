@@ -5,7 +5,15 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from help_text import CommandInfo, build_help_text, is_help_request
+from help_text import (
+    SOURCE_REPOSITORY_URL,
+    SPONSOR_URL,
+    CommandInfo,
+    build_help_text,
+    build_source_text,
+    build_sponsor_text,
+    is_help_request,
+)
 
 
 class HelpTextTests(unittest.TestCase):
@@ -20,7 +28,10 @@ class HelpTextTests(unittest.TestCase):
             "/ff14maint",
             "/ff14push",
             "/tarot",
+            "/今日小猪",
             "/groupmemory",
+            "/source",
+            "/sponsor",
             "/帮帮忙",
             "/暖暖",
             "/选门",
@@ -63,13 +74,18 @@ class HelpTextTests(unittest.TestCase):
         self.assertIn("@机器人 <FF14问题> — 查询新人基础知识与副本机制攻略", text)
         self.assertIn("别名 /塔罗", text)
         self.assertIn("今日运势或三牌占卜", text)
-        self.assertIn("/ff14push news|pvp on|off", text)
-        self.assertIn("/ff14push status|today", text)
-        self.assertIn("今日、明日战场", text)
+        self.assertIn("别名 /抽小猪、/我的小猪、/rollpig", text)
+        self.assertIn("抽取当天固定的专属小猪", text)
+        self.assertIn("/ff14push news|pvp on|off | status|today", text)
+        self.assertIn("/ff14push house on <服务器>", text)
+        self.assertIn("house off|now", text)
+        self.assertIn("战场轮换", text)
         self.assertIn("【说明】", text)
         self.assertIn("普通功能支持自然中文", text)
         self.assertIn("管理、会话、插件与模型配置仍需专用命令", text)
         self.assertIn("骚扰、提示词注入和套取内部配置", text)
+        self.assertIn(SOURCE_REPOSITORY_URL, text)
+        self.assertIn(SPONSOR_URL, text)
         self.assertIn("0–30% 概率主动参与对话", text)
         self.assertIn("仅限白名单 QQ 会话", text)
         self.assertIn("作者权限最高", text)
@@ -83,6 +99,18 @@ class HelpTextTests(unittest.TestCase):
         self.assertIn("/石之家 [帖子|攻略|招募|账号功能]", text)
         self.assertIn("/价格 [区服] <物品> [HQ] [数量]", text)
         self.assertIn("/logs <角色> <服务器> [国服|国际服]", text)
+
+    def test_source_reply_contains_public_repository(self) -> None:
+        self.assertEqual(
+            build_source_text(),
+            "机器人开源项目：\nhttps://github.com/zhui-zi/2bot",
+        )
+
+    def test_sponsor_reply_contains_public_address(self) -> None:
+        self.assertEqual(
+            build_sponsor_text(),
+            "机器人赞助地址：\nhttps://ifdian.net/a/keita",
+        )
 
     def test_live_state_applies_renames_and_omits_disabled_commands(self) -> None:
         text = build_help_text(
