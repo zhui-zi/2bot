@@ -13,10 +13,16 @@ from astrbot.api.message_components import At, Plain, Reply
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.message_event_result import MessageChain
-from astrbot_plugin_permissions.permission_core import (
-    permission_management_scope,
-    resolve_event_permission,
-)
+try:
+    from data.plugins.astrbot_plugin_permissions.permission_core import (
+        permission_management_scope,
+        resolve_event_permission,
+    )
+except ImportError:
+    from astrbot_plugin_permissions.permission_core import (
+        permission_management_scope,
+        resolve_event_permission,
+    )
 
 from .active_chat import (
     is_active_reply_candidate,

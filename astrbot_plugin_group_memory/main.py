@@ -12,10 +12,16 @@ from astrbot.api.message_components import At, Reply
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.agent.message import TextPart
-from astrbot_plugin_permissions.permission_core import (
-    PERMISSION_GROUP_MANAGER,
-    resolve_event_permission,
-)
+try:
+    from data.plugins.astrbot_plugin_permissions.permission_core import (
+        PERMISSION_GROUP_MANAGER,
+        resolve_event_permission,
+    )
+except ImportError:
+    from astrbot_plugin_permissions.permission_core import (
+        PERMISSION_GROUP_MANAGER,
+        resolve_event_permission,
+    )
 
 from .layered_memory import (
     LongTermMemory,

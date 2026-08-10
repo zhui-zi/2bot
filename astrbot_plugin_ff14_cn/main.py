@@ -10,10 +10,16 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.command import GreedyStr
-from astrbot_plugin_permissions.permission_core import (
-    PERMISSION_GROUP_MANAGER,
-    resolve_event_permission,
-)
+try:
+    from data.plugins.astrbot_plugin_permissions.permission_core import (
+        PERMISSION_GROUP_MANAGER,
+        resolve_event_permission,
+    )
+except ImportError:
+    from astrbot_plugin_permissions.permission_core import (
+        PERMISSION_GROUP_MANAGER,
+        resolve_event_permission,
+    )
 
 from .ff14_utils import (
     FeedItem,
