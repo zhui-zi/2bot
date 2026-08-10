@@ -8,6 +8,21 @@ SUPPORTED_STYLE_PLATFORMS = frozenset({"qq_official", "aiocqhttp"})
 STYLE_MARKER = "[Natural QQ chat style]"
 DEFAULT_RECENT_NEGATIVE_CONTEXT_MESSAGES = 4
 MAX_RECENT_NEGATIVE_CONTEXT_MESSAGES = 20
+DEFAULT_CASUAL_REPLY_MAX_CHARS = 42
+MIN_CASUAL_REPLY_MAX_CHARS = 16
+MAX_CASUAL_REPLY_MAX_CHARS = 120
+_DETAILED_ALLOW_REASONS = frozenset({"tarot_reading", "ff14_novice"})
+_DETAILED_REQUEST_MARKERS = (
+    "详细", "具体", "展开", "分析", "解释", "说明", "教程", "步骤", "攻略",
+    "怎么做", "怎么办", "如何", "为什么", "原因", "区别", "对比", "推荐",
+    "配置", "安装", "报错", "错误", "代码", "命令", "计算", "查询", "资料",
+    "机制", "打法", "配装", "循环", "属性", "在哪里", "在哪儿", "多少",
+    "什么时候", "是什么", "怎么回事", "天气", "新闻", "版本", "日期", "时间",
+    "几点", "几号", "多久", "价格", "how to", "why", "explain", "guide",
+    "steps", "error",
+)
+_SENTENCE_RE = re.compile(r"^(.+?[。！？!?…]+)(?:\s|$|.)", re.S)
+_SOFT_BREAKS = "，,；;：:"
 _EXPIRED_NEGATIVE_MARKERS = (
     "骚扰", "辱骂", "侮辱", "挑衅", "人身攻击", "恶意攻击", "威胁",
     "羞辱", "越界", "不尊重", "阴阳怪气", "记仇", "翻旧账", "底线",
@@ -33,7 +48,8 @@ NATURAL_CHAT_STYLE = f"""
 Reply like a person already taking part in the conversation, not a customer-service
 assistant writing a complete response. Match the other person's length and energy.
 For greetings, reactions, banter, feelings, and ordinary follow-ups, usually use one
-short natural sentence; fragments are fine. Do not restate the message, summarize,
+short natural sentence of roughly 30 Chinese characters; fragments are fine. Never
+use more than two sentences for casual chat. Do not restate the message, summarize,
 add a conclusion, or automatically turn it into advice. Avoid headings and lists
 unless the person clearly asks for structured or detailed information. Answer a
 factual, practical, strategy, or advice question accurately and fully; accuracy and
@@ -67,6 +83,54 @@ def normalize_recent_negative_context_count(value: object) -> int:
     except (TypeError, ValueError):
         return DEFAULT_RECENT_NEGATIVE_CONTEXT_MESSAGES
     return max(0, min(MAX_RECENT_NEGATIVE_CONTEXT_MESSAGES, count))
+
+
+def normalize_casual_reply_max_chars(value: object) -> int:
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_CASUAL_REPLY_MAX_CHARS
+    return max(MIN_CASUAL_REPLY_MAX_CHARS, min(MAX_CASUAL_REPLY_MAX_CHARS, count))
+
+
+def is_casual_chat_message(
+    message: object,
+    *,
+    allow_reason: object = "",
+) -> bool:
+    text = unicodedata.normalize("NFKC", str(message or "")).casefold().strip()
+    if not text or text.startswith("/"):
+        return False
+    if str(allow_reason or "").strip() in _DETAILED_ALLOW_REASONS:
+        return False
+    return not any(marker in text for marker in _DETAILED_REQUEST_MARKERS)
+
+
+def compact_casual_reply(
+    response: object,
+    *,
+    max_chars: object = DEFAULT_CASUAL_REPLY_MAX_CHARS,
+) -> str:
+    text = re.sub(r"\s+", " ", str(response or "")).strip()
+    if not text:
+        return ""
+    limit = normalize_casual_reply_max_chars(max_chars)
+    sentence = _first_sentence(text)
+    if len(sentence) <= limit:
+        return sentence
+    prefix = sentence[:limit]
+    for marker in _SOFT_BREAKS:
+        index = prefix.rfind(marker)
+        if index >= 6:
+            return prefix[:index].rstrip() + "。"
+    return prefix.rstrip("，,；;：:。！？!?… ") + "…"
+
+
+def _first_sentence(text: str) -> str:
+    match = _SENTENCE_RE.match(text)
+    if match:
+        return match.group(1).strip()
+    return text
 
 
 def forget_expired_negative_contexts(

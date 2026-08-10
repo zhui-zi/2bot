@@ -4,11 +4,15 @@ AstrBot request gate and optional active participation for QQ Official and SnowL
 
 The `natural_chat_style` option is enabled by default. It adds a compact system rule that makes casual replies follow the other person's length and energy, avoids unsolicited summaries and advice, and keeps detailed structure for questions that actually need it. The rule is added once per request and does not enter stored conversation history.
 
+Casual replies are also compacted deterministically after generation. Greetings, banter, reactions, feelings, and relationship chat keep only the first natural sentence, capped at 42 characters by default. Factual, technical, strategy, configuration, troubleshooting, and explicitly detailed requests are not compacted.
+
 Older hostile or negative exchanges are removed from model context by default. The newest four context messages remain available for immediate continuity, after which insults, harassment, arguments, and negative judgments stop influencing later topics.
 
 Private affinity is enabled by default. Each QQ sender has an isolated hashed state with a 0-100 score, positive interaction count, daily gain, repeated-romance signal count, and romance opt-out flag. Trigger messages are never stored. Normal direct conversation builds affinity gradually, repeated messages and rapid interactions do not farm points, daily gain is capped, and long inactivity causes a slow decay toward neutral. Harassment is not rewarded or stored as a negative relationship score.
 
 Relationship tone progresses from new to familiar, trusted, and close. Romantic tone remains locked until the sender has both sustained affinity and clear romantic interest on at least three separate days. Explicit friendship or no-flirting boundaries disable romantic tone without reducing affinity. The model receives only private behavioral guidance for the current sender and is instructed never to reveal scores, stages, or progression rules. Affection must remain non-exclusive, non-controlling, non-sexual, and subordinate to persona, safety, and accuracy.
+
+Private-state queries and prompt-extraction attempts are intercepted before the model. The model never receives the numeric score. Only AstrBot administrators or IDs in `affinity_manager_ids` can query state with `/affinity status [user ID]`; replying to or mentioning a target user is also supported. Unauthorized command calls return only a generic permission denial.
 
 The plugin allows direct LLM requests when a QQ Official group message contains a real `At` component targeting the bot or directly replies to a message sent by the bot. Normal plugin and built-in commands remain available. Trusted tarot, active group reply, and matched FF14 knowledge requests may explicitly allow their own model calls. This lets relevant FF14 questions work in an allowlisted QQ Official private session without opening unrelated private chat.
 

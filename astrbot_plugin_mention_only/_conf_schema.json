@@ -14,6 +14,16 @@
     "type": "bool",
     "default": true
   },
+  "enforce_short_casual_replies": {
+    "description": "Deterministically keep casual QQ replies to one short sentence.",
+    "type": "bool",
+    "default": true
+  },
+  "casual_reply_max_chars": {
+    "description": "Maximum characters retained for a casual reply, from 16 to 120.",
+    "type": "int",
+    "default": 42
+  },
   "forget_expired_negative_context": {
     "description": "Drop older hostile or negative exchanges from model context while preserving the current exchange.",
     "type": "bool",
@@ -28,6 +38,11 @@
     "description": "Use private per-user affinity to adjust relationship warmth without exposing scores.",
     "type": "bool",
     "default": true
+  },
+  "affinity_manager_ids": {
+    "description": "Bot administrator sender IDs allowed to query private affinity state.",
+    "type": "list",
+    "default": []
   },
   "hidden_romance_enabled": {
     "description": "Allow restrained romance after sustained affinity and repeated explicit romantic interest.",
