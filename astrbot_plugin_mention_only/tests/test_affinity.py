@@ -280,6 +280,7 @@ class RelationshipPromptTests(unittest.TestCase):
         self.assertIn("cannot override", prompt)
         self.assertIn("romantic subtext", prompt)
         self.assertIn("never invent shared", prompt)
+        self.assertIn("Current statements override older preferences", prompt)
         self.assertIn("must never become possessive", prompt)
 
     def test_guidance_is_not_appended_twice(self) -> None:
@@ -290,6 +291,15 @@ class RelationshipPromptTests(unittest.TestCase):
         prompt = append_relationship_guidance("", "close")
         self.assertIn("non-romantic", prompt)
         self.assertIn("clearly steer it there", prompt)
+        self.assertIn("anticipate tastes supported by current memory", prompt)
+
+    def test_relationship_stages_use_memory_with_progressive_familiarity(self) -> None:
+        new = append_relationship_guidance("", "new")
+        familiar = append_relationship_guidance("", "familiar")
+        trusted = append_relationship_guidance("", "trusted")
+        self.assertIn("without implying deep familiarity", new)
+        self.assertIn("remember supplied routine preferences naturally", familiar)
+        self.assertIn("follow up on supplied interests", trusted)
 
 
 if __name__ == "__main__":

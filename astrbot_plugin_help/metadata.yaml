@@ -1,7 +1,7 @@
 name: complete_help
 display_name: Complete Help
 desc: Replaces the built-in help output with concise Chinese command guidance.
-version: v1.6.0
+version: v1.7.0
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

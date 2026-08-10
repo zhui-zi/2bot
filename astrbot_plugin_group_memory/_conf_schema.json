@@ -4,15 +4,60 @@
     "type": "list",
     "default": []
   },
-  "max_records_per_group": {
-    "description": "Maximum persistent records stored for each allowlisted group.",
+  "short_term_max_records": {
+    "description": "Maximum recent conversational records kept for each allowlisted group.",
     "type": "int",
-    "default": 500
+    "default": 160
   },
-  "max_age_days": {
-    "description": "Maximum age of persistent group memory records in days.",
+  "short_term_days": {
+    "description": "Days that ordinary conversational records remain in short-term memory.",
+    "type": "int",
+    "default": 14
+  },
+  "long_term_max_memories_per_group": {
+    "description": "Maximum learned preferences and habits kept for one group.",
+    "type": "int",
+    "default": 300
+  },
+  "long_term_max_age_days": {
+    "description": "Hard maximum age for a long-term memory before it is forgotten.",
+    "type": "int",
+    "default": 730
+  },
+  "long_term_half_life_days": {
+    "description": "Half-life used for gradual long-term memory strength decay.",
     "type": "int",
     "default": 180
+  },
+  "long_term_min_strength_percent": {
+    "description": "Decayed long-term memories below this strength are forgotten after the initial grace period.",
+    "type": "int",
+    "default": 12
+  },
+  "long_term_recall_boost_percent": {
+    "description": "Strength restored when a long-term memory is naturally recalled.",
+    "type": "int",
+    "default": 6
+  },
+  "long_term_recall_cooldown_hours": {
+    "description": "Minimum interval before another recall can reinforce the same memory.",
+    "type": "int",
+    "default": 12
+  },
+  "long_term_relevant_memories": {
+    "description": "Maximum topic-relevant long-term memories injected per request.",
+    "type": "int",
+    "default": 4
+  },
+  "long_term_personal_memories": {
+    "description": "Maximum learned preferences for the current member injected per request.",
+    "type": "int",
+    "default": 3
+  },
+  "long_term_injected_chars": {
+    "description": "Maximum long-term memory characters injected per request.",
+    "type": "int",
+    "default": 1800
   },
   "forget_negative_messages": {
     "description": "Do not retain harassment, hostility, transient negative emotions, or grudge-like replies.",

@@ -21,7 +21,7 @@ from .help_text import (
     "complete_help",
     "keita",
     "Replaces the built-in help output with concise Chinese command guidance.",
-    "1.6.0",
+    "1.7.0",
 )
 class CompleteHelp(Star):
     def __init__(self, context: Context):

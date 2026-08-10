@@ -13,6 +13,15 @@ from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.agent.message import TextPart
 
+from .layered_memory import (
+    LongTermMemory,
+    learn_long_term_memories,
+    parse_long_term_memory,
+    prune_long_term_memories,
+    reinforce_recalled_memories,
+    render_long_term_memories,
+    select_long_term_memories,
+)
 from .memory_core import (
     MemoryRecord,
     MemberRelation,
@@ -34,14 +43,14 @@ from .memory_core import (
 )
 
 
-STATE_VERSION = 4
+STATE_VERSION = 5
 
 
 @register(
     "group_persistent_memory",
     "keita",
     "Keeps isolated persistent chat memory for allowlisted QQ groups.",
-    "1.4.0",
+    "1.5.0",
 )
 class GroupPersistentMemory(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -49,6 +58,7 @@ class GroupPersistentMemory(Star):
         self.config = config
         self._lock = asyncio.Lock()
         self._cache: dict[str, list[MemoryRecord]] = {}
+        self._long_term_cache: dict[str, list[LongTermMemory]] = {}
 
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=100)
     async def record_group_message(self, event: AstrMessageEvent) -> None:
@@ -69,7 +79,7 @@ class GroupPersistentMemory(Star):
             )
         ):
             return
-        records = await self._load(event)
+        records, _memories = await self._load_state(event)
         relations = self._event_relations(event, text, records)
         await self._append(
             event,
@@ -103,7 +113,7 @@ class GroupPersistentMemory(Star):
         with suppress(Exception):
             current_text = normalize_record_text(event.get_message_str() or "", 1000)
             query_parts.append(current_text)
-        records = await self._load(event)
+        records, long_term_memories = await self._load_state(event)
         current_record_matches = bool(
             current_text
             and records
@@ -155,6 +165,24 @@ class GroupPersistentMemory(Star):
             request.extra_user_content_parts.append(
                 TextPart(text=context_text).mark_as_temp()
             )
+        selected_long_term = select_long_term_memories(
+            long_term_memories,
+            "\n".join(query_parts),
+            current_sender_id=current_sender_id,
+            relevant_count=self._bounded("long_term_relevant_memories", 4, 0, 12),
+            personal_count=self._bounded("long_term_personal_memories", 3, 0, 10),
+            max_chars=self._bounded("long_term_injected_chars", 1800, 300, 5000),
+            half_life_days=self._bounded("long_term_half_life_days", 180, 7, 3650),
+        )
+        long_term_text = render_long_term_memories(selected_long_term)
+        if long_term_text:
+            request.extra_user_content_parts.append(
+                TextPart(text=long_term_text).mark_as_temp()
+            )
+            await self._reinforce_memories(
+                event,
+                {memory.memory_id for memory in selected_long_term},
+            )
 
     @filter.on_llm_response()
     async def record_bot_response(
@@ -200,12 +228,13 @@ class GroupPersistentMemory(Star):
             return
         normalized_action = str(action or "status").casefold().strip()
         if normalized_action in {"status", "状态"}:
-            records = await self._load(event)
+            records, memories = await self._load_state(event)
             user_count = sum(record.role == "user" for record in records)
             bot_count = len(records) - user_count
             yield event.plain_result(
-                f"当前群记忆：{len(records)} 条\n"
+                f"当前群短期记忆：{len(records)} 条\n"
                 f"群成员消息：{user_count} 条\n机器人回复：{bot_count} 条\n"
+                f"长期偏好与习惯：{len(memories)} 条\n"
                 "各白名单群的记忆彼此隔离。"
             )
             return
@@ -216,31 +245,49 @@ class GroupPersistentMemory(Star):
             async with self._lock:
                 key = self._group_key(event)
                 self._cache[key] = []
-                await self.put_kv_data(self._state_key(key), self._serialize([]))
-            yield event.plain_result("当前群的持久化记忆已清空，其他群不受影响。")
+                self._long_term_cache[key] = []
+                await self.put_kv_data(self._state_key(key), self._serialize([], []))
+            yield event.plain_result("当前群的短期与长期记忆已清空，其他群不受影响。")
             return
         yield event.plain_result("用法：/groupmemory status 或 /groupmemory clear")
 
     async def _append(self, event: AstrMessageEvent, record: MemoryRecord) -> None:
         async with self._lock:
             key = self._group_key(event)
-            records = await self._load_locked(key)
+            records, memories = await self._load_locked(key)
             records = append_record(
                 records,
                 record,
-                max_records=self._bounded("max_records_per_group", 500, 20, 3000),
-                max_age_days=self._bounded("max_age_days", 180, 1, 3650),
+                max_records=self._bounded("short_term_max_records", 160, 20, 1000),
+                max_age_days=self._bounded("short_term_days", 14, 1, 90),
             )
+            memories = learn_long_term_memories(memories, record)
+            memories = self._prune_memories(memories)
             self._cache[key] = records
-            await self.put_kv_data(self._state_key(key), self._serialize(records))
+            self._long_term_cache[key] = memories
+            await self.put_kv_data(
+                self._state_key(key),
+                self._serialize(records, memories),
+            )
 
     async def _load(self, event: AstrMessageEvent) -> list[MemoryRecord]:
-        async with self._lock:
-            return list(await self._load_locked(self._group_key(event)))
+        records, _memories = await self._load_state(event)
+        return records
 
-    async def _load_locked(self, key: str) -> list[MemoryRecord]:
-        if key in self._cache:
-            return self._cache[key]
+    async def _load_state(
+        self,
+        event: AstrMessageEvent,
+    ) -> tuple[list[MemoryRecord], list[LongTermMemory]]:
+        async with self._lock:
+            records, memories = await self._load_locked(self._group_key(event))
+            return list(records), list(memories)
+
+    async def _load_locked(
+        self,
+        key: str,
+    ) -> tuple[list[MemoryRecord], list[LongTermMemory]]:
+        if key in self._cache and key in self._long_term_cache:
+            return self._cache[key], self._long_term_cache[key]
         raw = await self.get_kv_data(self._state_key(key), {"records": []})
         raw_records = raw.get("records", []) if isinstance(raw, dict) else []
         parsed = [record for item in raw_records if (record := parse_record(item))]
@@ -248,21 +295,113 @@ class GroupPersistentMemory(Star):
             parsed,
             forget_negative=self._forget_negative_messages(),
         )
+        raw_memories = raw.get("long_term_memories", []) if isinstance(raw, dict) else []
+        memories = [
+            memory
+            for item in raw_memories
+            if (memory := parse_long_term_memory(item))
+        ] if isinstance(raw_memories, list) else []
+        raw_version = int(raw.get("version", 0) or 0) if isinstance(raw, dict) else 0
+        raw_memory_count = len(raw_memories) if isinstance(raw_memories, list) else 0
+        migrated = raw_version < STATE_VERSION
+        if migrated:
+            for record in records:
+                memories = learn_long_term_memories(
+                    memories,
+                    record,
+                    now=record.timestamp,
+                )
+        current_time = time.time()
+        oldest = current_time - self._bounded("short_term_days", 14, 1, 90) * 86400
+        records = [record for record in records if record.timestamp >= oldest]
+        records = records[-self._bounded("short_term_max_records", 160, 20, 1000):]
+        memories = self._prune_memories(memories, now=current_time)
+        needs_write = bool(
+            migrated
+            or len(records) != len(parsed)
+            or len(memories) != raw_memory_count
+            or raw_version != STATE_VERSION
+        )
         if len(records) != len(parsed):
             logger.info(
-                "Pruned %s transient negative group-memory records.",
+                "Pruned %s expired or transient group-memory records.",
                 len(parsed) - len(records),
             )
-            await self.put_kv_data(self._state_key(key), self._serialize(records))
+        if needs_write:
+            await self.put_kv_data(
+                self._state_key(key),
+                self._serialize(records, memories),
+            )
         self._cache[key] = records
-        return records
+        self._long_term_cache[key] = memories
+        return records, memories
 
     @staticmethod
-    def _serialize(records: list[MemoryRecord]) -> dict[str, Any]:
+    def _serialize(
+        records: list[MemoryRecord],
+        memories: list[LongTermMemory],
+    ) -> dict[str, Any]:
         return {
             "version": STATE_VERSION,
             "records": [record.to_dict() for record in records],
+            "long_term_memories": [memory.to_dict() for memory in memories],
         }
+
+    async def _reinforce_memories(
+        self,
+        event: AstrMessageEvent,
+        recalled_ids: set[str],
+    ) -> None:
+        if not recalled_ids:
+            return
+        async with self._lock:
+            key = self._group_key(event)
+            records, memories = await self._load_locked(key)
+            reinforced = reinforce_recalled_memories(
+                memories,
+                recalled_ids,
+                now=time.time(),
+                half_life_days=self._bounded(
+                    "long_term_half_life_days", 180, 7, 3650
+                ),
+                boost=self._bounded("long_term_recall_boost_percent", 6, 0, 25)
+                / 100,
+                cooldown_hours=self._bounded(
+                    "long_term_recall_cooldown_hours", 12, 0, 168
+                ),
+            )
+            if reinforced == memories:
+                return
+            reinforced = self._prune_memories(reinforced)
+            self._long_term_cache[key] = reinforced
+            await self.put_kv_data(
+                self._state_key(key),
+                self._serialize(records, reinforced),
+            )
+
+    def _prune_memories(
+        self,
+        memories: list[LongTermMemory],
+        *,
+        now: float | None = None,
+    ) -> list[LongTermMemory]:
+        return prune_long_term_memories(
+            memories,
+            now=time.time() if now is None else now,
+            half_life_days=self._bounded(
+                "long_term_half_life_days", 180, 7, 3650
+            ),
+            min_strength=self._bounded(
+                "long_term_min_strength_percent", 12, 1, 80
+            )
+            / 100,
+            max_age_days=self._bounded(
+                "long_term_max_age_days", 730, 30, 3650
+            ),
+            max_memories=self._bounded(
+                "long_term_max_memories_per_group", 300, 20, 2000
+            ),
+        )
 
     def _is_allowed_group(self, event: AstrMessageEvent) -> bool:
         if event.get_platform_name() not in {"qq_official", "aiocqhttp"}:
