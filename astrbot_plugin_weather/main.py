@@ -25,7 +25,7 @@ from .weather_core import (
     "weather_lookup",
     "keita",
     "Queries current weather and short forecasts without an LLM.",
-    "1.0.0",
+    "1.0.1",
 )
 class WeatherLookup(Star):
     def __init__(self, context: Context, config: AstrBotConfig):

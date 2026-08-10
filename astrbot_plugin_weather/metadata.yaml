@@ -1,7 +1,7 @@
 name: weather_lookup
 display_name: Weather Lookup
 desc: Compact current weather and short forecasts using public APIs.
-version: v1.0.0
+version: v1.0.1
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

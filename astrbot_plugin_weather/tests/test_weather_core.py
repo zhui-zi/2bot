@@ -74,8 +74,9 @@ class WeatherCoreTests(unittest.TestCase):
         self.assertIn("晴间多云，27.2°C（体感 30.1°C）", text)
         self.assertIn("22.1～29.4°C，降水 40%", text)
         self.assertIn("湿度 78%", text)
-        self.assertIn("© OpenStreetMap contributors", text)
-        self.assertEqual(len(text.splitlines()), 4)
+        self.assertNotIn("Open-Meteo", text)
+        self.assertNotIn("OpenStreetMap", text)
+        self.assertEqual(len(text.splitlines()), 3)
 
     def test_renders_single_future_day(self) -> None:
         location = Location("上海市", 31.2, 121.5)

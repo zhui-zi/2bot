@@ -148,13 +148,7 @@ def render_weather(report: WeatherReport) -> str:
         weather_lines = [
             f"{report.condition}，{temperature_range}，降水 {report.precipitation_probability}%"
         ]
-    return "\n".join(
-        [
-            title,
-            *weather_lines,
-            "天气：Open-Meteo｜地点：© OpenStreetMap contributors",
-        ]
-    )
+    return "\n".join([title, *weather_lines])
 
 
 def weather_condition(code: int) -> str:
