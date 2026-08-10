@@ -48,7 +48,7 @@ DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.3.2",
+    "1.3.3",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
