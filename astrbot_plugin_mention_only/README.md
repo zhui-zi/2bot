@@ -6,7 +6,7 @@ Every group model turn receives a current-member identity prefix from the group-
 
 The `natural_chat_style` option is enabled by default. It adds a compact system rule that makes casual replies follow the other person's length and energy, avoids unsolicited summaries and advice, and keeps detailed structure for questions that actually need it. It also keeps conflict temperature low: ambiguous wording receives a benign reading, disagreement targets the point instead of the person, and insults, contempt, retaliatory sarcasm, public shaming, and angry lectures are prohibited. Boundaries stay brief and conversational. The rule is added once per request and does not enter stored conversation history.
 
-Casual replies are also compacted deterministically after generation. Greetings, banter, reactions, feelings, and relationship chat keep only the first natural sentence, capped at 42 characters by default. Factual, technical, strategy, configuration, troubleshooting, and explicitly detailed requests are not compacted.
+Generated replies are not truncated after completion. This keeps the text sent to QQ identical to the assistant reply stored in AstrBot conversation history; brevity is controlled by the request-time style guidance instead.
 
 Older hostile or negative exchanges are removed from model context by default. The newest four context messages remain available for immediate continuity, after which insults, harassment, arguments, and negative judgments stop influencing later topics.
 

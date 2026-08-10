@@ -55,6 +55,21 @@ class PvpKnowledgeTests(unittest.TestCase):
         self.assertIn("立刻确认水晶是否有人推进", rendered)
         self.assertIn("不要逐个回去送人", rendered)
 
+    def test_55_alias_retrieves_crystalline_conflict_guidance(self) -> None:
+        for query in ("55 怎么打", "5v5怎么玩"):
+            with self.subTest(query=query):
+                selected = self.index.search(query)
+                self.assertTrue(selected)
+                self.assertEqual(
+                    selected[0].document_id,
+                    "curated/pvp/crystalline-conflict",
+                )
+                self.assertIn(
+                    "curated/pvp/crystalline-conflict",
+                    {chunk.document_id for chunk in selected},
+                )
+        self.assertFalse(self.index.search("55岁生日怎么过"))
+
     def test_map_overview_keeps_legacy_rules_out_of_current_claims(self) -> None:
         selected = self.index.search("纷争前线有哪些地图？")
         self.assertTrue(selected)

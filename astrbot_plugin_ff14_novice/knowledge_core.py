@@ -63,6 +63,8 @@ class KnowledgeIndex:
 
     def search(self, query: str) -> tuple[KnowledgeChunk, ...]:
         normalized_query = normalize_text(query)
+        if _query_uses_crystalline_conflict_alias(normalized_query):
+            normalized_query += " 水晶冲突"
         query_tokens = set(_tokenize(normalized_query))
         if not query_tokens:
             return ()
@@ -188,6 +190,13 @@ def _query_matches_pvp_topic(normalized_query: str, title: str) -> bool:
     return any(
         marker in normalized_query and marker in normalized_title
         for marker in ("pvp", "战场", "纷争前线", "水晶冲突", "昂萨哈凯尔")
+    )
+
+
+def _query_uses_crystalline_conflict_alias(normalized_query: str) -> bool:
+    return bool(
+        re.search(r"(?<![0-9a-z])(?:5v5|55)(?![0-9a-z])", normalized_query)
+        and re.search(r"(?:怎么打|怎么玩|如何打|如何玩|打法|玩法|攻略)", normalized_query)
     )
 
 

@@ -11,10 +11,7 @@ sys.path.insert(0, str(PLUGIN_DIR))
 from chat_style import (  # noqa: E402
     STYLE_MARKER,
     append_natural_chat_style,
-    compact_casual_reply,
     forget_expired_negative_contexts,
-    is_casual_chat_message,
-    normalize_casual_reply_max_chars,
     normalize_recent_negative_context_count,
     should_apply_natural_style,
 )
@@ -105,31 +102,10 @@ class NaturalChatStyleTests(unittest.TestCase):
             contexts[2:],
         )
 
-    def test_classifies_casual_and_detailed_requests(self) -> None:
-        self.assertTrue(is_casual_chat_message("你在干嘛"))
-        self.assertTrue(is_casual_chat_message("今天好累啊"))
-        self.assertFalse(is_casual_chat_message("为什么这个机制会团灭？"))
-        self.assertFalse(is_casual_chat_message("请给我详细配置步骤"))
-        self.assertFalse(
-            is_casual_chat_message("抽张牌", allow_reason="tarot_reading")
-        )
-        self.assertFalse(is_casual_chat_message("/攻略 绝本"))
-
-    def test_compacts_casual_reply_to_first_sentence(self) -> None:
-        response = "在等你开口啊。其实我刚才还想了很多，不过没必要都说出来。"
-        self.assertEqual(compact_casual_reply(response), "在等你开口啊。")
-        self.assertEqual(compact_casual_reply("行。"), "行。")
-
-    def test_compacts_unpunctuated_long_reply_at_natural_break(self) -> None:
-        response = "今天确实有点累，不过看到你过来以后感觉好多了还想再聊一会儿"
-        compacted = compact_casual_reply(response, max_chars=24)
-        self.assertEqual(compacted, "今天确实有点累。")
-
-    def test_normalizes_casual_reply_limit(self) -> None:
-        self.assertEqual(normalize_casual_reply_max_chars(1), 16)
-        self.assertEqual(normalize_casual_reply_max_chars(42), 42)
-        self.assertEqual(normalize_casual_reply_max_chars(999), 120)
-        self.assertEqual(normalize_casual_reply_max_chars("bad"), 42)
+    def test_main_never_truncates_completed_replies(self) -> None:
+        source = (PLUGIN_DIR / "main.py").read_text(encoding="utf-8")
+        self.assertNotIn("compact_casual_reply", source)
+        self.assertNotIn("_mention_only_compact_casual", source)
 
 
 if __name__ == "__main__":

@@ -19,16 +19,6 @@
     "type": "bool",
     "default": true
   },
-  "enforce_short_casual_replies": {
-    "description": "Deterministically keep casual QQ replies to one short sentence.",
-    "type": "bool",
-    "default": true
-  },
-  "casual_reply_max_chars": {
-    "description": "Maximum characters retained for a casual reply, from 16 to 120.",
-    "type": "int",
-    "default": 42
-  },
   "forget_expired_negative_context": {
     "description": "Drop older hostile or negative exchanges from model context while preserving the current exchange.",
     "type": "bool",

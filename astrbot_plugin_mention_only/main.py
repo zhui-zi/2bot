@@ -42,9 +42,7 @@ from .affinity import (
 )
 from .chat_style import (
     append_natural_chat_style,
-    compact_casual_reply,
     forget_expired_negative_contexts,
-    is_casual_chat_message,
     should_apply_natural_style,
 )
 
@@ -53,7 +51,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.11.0",
+    "1.12.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -152,16 +150,6 @@ class MentionOnlyChat(Star):
         platform_name = event.get_platform_name()
         if should_apply_natural_style(
             platform_name,
-            self.config.get("enforce_short_casual_replies", True),
-        ):
-            casual = is_casual_chat_message(
-                event.get_message_str() or request.prompt or "",
-                allow_reason=event.get_extra("_mention_only_llm_allow") or "",
-            )
-            event.set_extra("_mention_only_compact_casual", "1" if casual else "0")
-
-        if should_apply_natural_style(
-            platform_name,
             self.config.get("hidden_affinity_enabled", True),
         ):
             state = await self._relationship_state(event)
@@ -190,21 +178,6 @@ class MentionOnlyChat(Star):
             self.config.get("natural_chat_style", True),
         ):
             request.system_prompt = append_natural_chat_style(request.system_prompt)
-
-    @filter.on_llm_response(priority=200)
-    async def enforce_casual_reply_length(
-        self,
-        event: AstrMessageEvent,
-        response: LLMResponse,
-    ) -> None:
-        if event.get_extra("_mention_only_compact_casual") != "1":
-            return
-        compacted = compact_casual_reply(
-            response.completion_text or "",
-            max_chars=self.config.get("casual_reply_max_chars", 42),
-        )
-        if compacted and compacted != response.completion_text:
-            response.completion_text = compacted
 
     @filter.on_llm_response(priority=-100)
     async def quote_group_reply_target(

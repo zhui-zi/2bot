@@ -191,6 +191,8 @@ class NaturalCommandTests(unittest.TestCase):
             "@阿尔博特二号机 教我打尘封密岩",
             "尘封秘岩怎么玩",
             "昂萨哈凯尔打法",
+            "55 怎么打",
+            "5v5怎么玩",
         )
         for message in messages:
             with self.subTest(message=message):
@@ -201,6 +203,7 @@ class NaturalCommandTests(unittest.TestCase):
             "今天和明天是什么战场",
             "取消订阅每日战场通知",
             "查副本攻略 神龙梦幻歼灭战",
+            "55岁生日怎么过",
         ):
             with self.subTest(message=message):
                 self.assertFalse(is_pvp_gameplay_question(message))

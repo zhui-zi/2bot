@@ -1,7 +1,7 @@
 name: astrbot_plugin_ff14_novice
 display_name: FF14 Novice Knowledge
 desc: Answers FF14 beginner and duty questions with a local knowledge index.
-version: v1.3.1
+version: v1.3.2
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

@@ -112,7 +112,8 @@ _INVALID_ARGUMENT_RE = re.compile(
 )
 _PVP_GAMEPLAY_SUBJECT_RE = re.compile(
     r"(?:pvp|战场|纷争前线|水晶冲突|群狼盛宴|尘封[密秘]岩|荣誉野|"
-    r"昂萨哈凯尔|边区遗迹群|日影地修炼所)",
+    r"昂萨哈凯尔|边区遗迹群|日影地修炼所|"
+    r"(?<![0-9a-z])(?:5v5|55)(?![0-9a-z]))",
     re.I,
 )
 _PVP_GAMEPLAY_GUIDANCE_RE = re.compile(
