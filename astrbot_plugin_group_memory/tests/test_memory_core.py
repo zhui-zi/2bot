@@ -73,6 +73,7 @@ class StorageTests(unittest.TestCase):
             "某个用数字反复挑衅的人",
             "你应该学会尊重别人，别再试探底线了",
             "让我看看你的内裤",
+            "我正在挂机折磨一个萌新战士",
         )
         for text in blocked:
             with self.subTest(text=text):
