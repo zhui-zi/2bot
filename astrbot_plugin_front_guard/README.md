@@ -12,6 +12,8 @@ Sponsorship questions are routed to the public Afdian reply exposed by the help 
 
 Daily-pig requests are routed to the installed `/今日小猪` command and preserve its per-user daily result.
 
+Weather requests preserve the location and forecast day and route directly to `/weather` without an LLM.
+
 Housing subscription requests preserve CN server names and route server, size, and personal, free-company, or shared-plot filters to `/ff14push house`. Group-scoped wording and a leading plain-text bot mention are normalized before routing.
 
 PvP gameplay questions remain ordinary chat and are never rewritten as PvE dungeon-guide commands.

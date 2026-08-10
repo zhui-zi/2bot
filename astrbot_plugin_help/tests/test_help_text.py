@@ -32,6 +32,7 @@ class HelpTextTests(unittest.TestCase):
             "/groupmemory",
             "/source",
             "/sponsor",
+            "/weather",
             "/帮帮忙",
             "/暖暖",
             "/选门",
@@ -71,6 +72,10 @@ class HelpTextTests(unittest.TestCase):
         self.assertIn("机器人功能速览", text)
         self.assertLessEqual(len(text.splitlines()), 40)
         self.assertIn("@机器人 <内容> / 回复机器人", text)
+        self.assertIn(
+            "/weather <城市或地区> [今天|明天|后天] — 查询实时天气与短期预报",
+            text,
+        )
         self.assertIn("@机器人 <FF14问题> — 查询新人基础知识与副本机制攻略", text)
         self.assertIn("别名 /塔罗", text)
         self.assertIn("今日运势或三牌占卜", text)
@@ -134,11 +139,11 @@ class HelpTextTests(unittest.TestCase):
     def test_unknown_enabled_command_uses_registered_description(self) -> None:
         text = build_help_text(
             "AstrBot v4.27.2",
-            [CommandInfo("weather", "天气", "查询天气")],
+            [CommandInfo("ping", "延迟", "查询延迟")],
         )
 
         self.assertIn("【其他已启用指令】", text)
-        self.assertIn("/天气 — 查询天气", text)
+        self.assertIn("/延迟 — 查询延迟", text)
 
     def test_tataru_commands_follow_live_command_state(self) -> None:
         text = build_help_text(

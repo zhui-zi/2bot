@@ -1,0 +1,22 @@
+{
+  "geocoding_url": {
+    "description": "Nominatim-compatible geocoding endpoint.",
+    "type": "string",
+    "default": "https://nominatim.openstreetmap.org/search"
+  },
+  "forecast_url": {
+    "description": "Open-Meteo-compatible forecast endpoint.",
+    "type": "string",
+    "default": "https://api.open-meteo.com/v1/forecast"
+  },
+  "request_timeout_seconds": {
+    "description": "Weather request timeout in seconds.",
+    "type": "float",
+    "default": 12
+  },
+  "geocode_cache_hours": {
+    "description": "Location cache lifetime in hours.",
+    "type": "float",
+    "default": 24
+  }
+}

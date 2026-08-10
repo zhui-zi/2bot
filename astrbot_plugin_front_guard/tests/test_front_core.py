@@ -35,6 +35,7 @@ class NaturalCommandTests(unittest.TestCase):
             "你有什么功能": CommandIntent("help"),
             "机器人的开源地址": CommandIntent("source"),
             "机器人的赞助地址": CommandIntent("sponsor"),
+            "查一下明天上海天气": CommandIntent("weather", "明天上海"),
             "占卜一下我这周的运势": CommandIntent("tarot", "我这周的运势"),
             "看看我的小猪": CommandIntent("今日小猪"),
             "请开启国服新闻推送": CommandIntent("ff14push", "news on"),
@@ -127,6 +128,20 @@ class NaturalCommandTests(unittest.TestCase):
         ):
             with self.subTest(message=message):
                 self.assertEqual(match_natural_command(message), CommandIntent("sponsor"))
+
+    def test_routes_weather_without_matching_weather_discussion(self) -> None:
+        cases = {
+            "北京天气怎么样": CommandIntent("weather", "北京"),
+            "看看东京后天天气预报": CommandIntent("weather", "东京后天"),
+            "@阿尔博特二号机 查一下明天上海天气": CommandIntent(
+                "weather", "明天上海"
+            ),
+        }
+        for message, expected in cases.items():
+            with self.subTest(message=message):
+                self.assertEqual(match_natural_command(message), expected)
+        self.assertIsNone(match_natural_command("你喜欢什么天气"))
+        self.assertIsNone(match_natural_command("全球变暖为什么影响天气"))
 
     def test_routes_daily_pig_requests_without_matching_discussion(self) -> None:
         for message in (

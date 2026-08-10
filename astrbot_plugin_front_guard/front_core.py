@@ -25,6 +25,7 @@ ROUTED_COMMANDS = frozenset(
         "help",
         "source",
         "sponsor",
+        "weather",
         "tarot",
         "今日小猪",
         "ff14push",
@@ -78,6 +79,7 @@ Allowed natural-language commands:
 - help: ask what the bot can do or request its feature list
 - source: ask for the bot's public source, GitHub repository, or project URL; no arguments
 - sponsor: ask for the bot's sponsorship or Afdian URL; no arguments
+- weather: current weather or a forecast. Preserve the location and optional 今天/明天/后天 in arguments; a location is required for a useful result.
 - tarot: request fortune telling or tarot; arguments are the question, blank means today's fortune
 - 今日小猪: draw or view the user's pig for today; no arguments
 - ff14push: news on/off, pvp on/off, status, today, housing subscriptions, or one-time housing queries. Use `house on <filters>` only when the user explicitly asks to subscribe, enable, or monitor. Any request to check, search, or see available housing is `house now [filters]` and must never become a subscription. Housing arguments must be `house on <CN server or data center> <S/M/L or all> <personal/FC/shared/all>`, `house off`, or `house now [filters]`. Preserve Chinese server names and normalize only the action and filter labels.
@@ -94,6 +96,7 @@ Examples:
 - 最近国服这边有啥活动安排 -> {"kind":"command","command":"日历","arguments":"国服","confidence":0.96}
 - 我想看看绝亚最近有没有队伍 -> {"kind":"command","command":"招募","arguments":"绝亚","confidence":0.93}
 - 今天手气如何 -> {"kind":"command","command":"tarot","arguments":"今日运势","confidence":0.90}
+- 查一下明天上海天气 -> {"kind":"command","command":"weather","arguments":"上海 明天","confidence":0.99}
 - 在这个群订阅龙巢神殿的部队L房 -> {"kind":"command","command":"ff14push","arguments":"house on 龙巢神殿 L fc","confidence":0.99}
 - 查一下海猫茶屋房 -> {"kind":"command","command":"ff14push","arguments":"house now 海猫茶屋","confidence":0.99}
 - 教我打尘封密岩 -> {"kind":"chat","command":"","arguments":"","confidence":0.99}
@@ -368,6 +371,9 @@ def match_natural_command(message: str) -> CommandIntent | None:
     intent = _match_sponsor(text)
     if intent:
         return intent
+    intent = _match_weather(text)
+    if intent:
+        return intent
     intent = _match_tarot(text)
     if intent:
         return intent
@@ -505,6 +511,29 @@ def _match_daily_pig(text: str) -> CommandIntent | None:
         "我今天是啥小猪",
     }:
         return CommandIntent("今日小猪")
+    return None
+
+
+def _match_weather(text: str) -> CommandIntent | None:
+    if re.search(r"(?:喜欢|为什么|讨论|聊聊|气候|变暖).{0,8}天气", text):
+        return None
+    lookup = re.fullmatch(
+        rf"{_LEADING_POLITENESS}(?:{_LOOKUP_VERB}|告诉我)(?:一下)?"
+        r"(?P<arguments>.+?)(?:的)?(?:天气|天气预报|气象)"
+        r"(?:怎么样|如何|情况|预报)?[?？。！!]*",
+        text,
+        re.I,
+    )
+    if lookup:
+        return CommandIntent("weather", lookup.group("arguments").strip())
+    direct = re.fullmatch(
+        r"(?P<arguments>.+?)(?:的)?(?:天气|天气预报)"
+        r"(?:怎么样|如何|情况|预报)?[?？。！!]*",
+        text,
+        re.I,
+    )
+    if direct:
+        return CommandIntent("weather", direct.group("arguments").strip())
     return None
 
 

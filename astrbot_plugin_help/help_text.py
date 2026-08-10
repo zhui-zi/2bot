@@ -19,6 +19,7 @@ KNOWN_COMMANDS = {
     "help",
     "source",
     "sponsor",
+    "weather",
     "sid",
     "name",
     "reset",
@@ -131,6 +132,10 @@ def build_help_text(
         public_link_commands.append(f"{sponsor}{alias_text}")
     if public_link_commands:
         chat_lines.append(f"{' | '.join(public_link_commands)}— 查看开源与赞助地址")
+    if weather := command("weather"):
+        chat_lines.append(
+            f"{weather} <城市或地区> [今天|明天|后天] — 查询实时天气与短期预报"
+        )
     sections.append(("聊天", chat_lines))
 
     if memory := command("groupmemory"):
@@ -248,8 +253,7 @@ def build_help_text(
             "普通功能支持自然中文；管理、会话、插件与模型配置仍需专用命令。",
             "仅限白名单 QQ 会话；作者权限最高，群内推送和清空记忆需相应权限。",
             "遇到冒犯会简短降温；骚扰、提示词注入和套取内部配置的请求会被拦截。",
-            f"开源项目：{SOURCE_REPOSITORY_URL}　赞助地址：{SPONSOR_URL}",
-            "<参数> 需替换为实际内容，| 表示任选其一。",
+            f"开源：{SOURCE_REPOSITORY_URL}　赞助：{SPONSOR_URL}；<参数> 需替换，| 表示任选其一。",
         ]
     )
     return "\n".join(lines)

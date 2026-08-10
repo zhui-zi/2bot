@@ -1,0 +1,10 @@
+name: weather_lookup
+display_name: Weather Lookup
+desc: Compact current weather and short forecasts using public APIs.
+version: v1.0.0
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.23.1,<5"
