@@ -23,11 +23,13 @@ from .active_chat import (
 from .affinity import (
     AffinityState,
     advance_affinity,
+    affinity_management_scope,
     affinity_state_key,
     append_relationship_guidance,
-    can_manage_affinity,
+    extract_platform_roles,
     parse_affinity_state,
     private_state_probe_kind,
+    resolve_management_target,
     relationship_stage,
 )
 from .chat_style import (
@@ -43,7 +45,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.7.0",
+    "1.8.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -66,7 +68,9 @@ class MentionOnlyChat(Star):
         if not (bool(event.is_private_chat()) or self._targets_bot(event)):
             return
         if self._can_manage_affinity(event):
-            yield event.plain_result("管理员请使用 /affinity status，并回复或 @ 目标用户。")
+            yield event.plain_result(
+                "管理员请使用 /affinity status|reset，并回复或 @ 目标用户。"
+            )
         elif probe_kind == "affinity":
             yield event.plain_result("哪有这种数值。相处得怎么样，你自己感觉不出来？")
         else:
@@ -231,19 +235,39 @@ class MentionOnlyChat(Star):
         action: str = "status",
         target_id: str = "",
     ):
-        if not self._can_manage_affinity(event):
+        management_scope = self._affinity_management_scope(event)
+        if management_scope == "none":
             yield event.plain_result("无权限。")
             return
-        if str(action or "status").casefold().strip() not in {
-            "status", "query", "状态", "查询",
-        }:
+        normalized_action = str(action or "status").casefold().strip()
+        status_actions = {"status", "query", "状态", "查询"}
+        reset_actions = {"reset", "clear", "重置", "清空"}
+        if normalized_action not in status_actions | reset_actions:
             yield event.plain_result(
-                "用法：/affinity status [用户ID]，也可以回复或 @ 目标用户。"
+                "用法：/affinity status|reset [用户ID]，也可以回复或 @ 目标用户。"
             )
             return
-        target = str(target_id or "").strip() or self._affinity_target(event)
-        if not target:
-            target = str(event.get_sender_id() or "").strip()
+        explicit_target = str(target_id or "").strip()
+        message_target = self._affinity_target(event)
+        target, target_error = resolve_management_target(
+            management_scope,
+            event.get_sender_id(),
+            explicit_target=explicit_target,
+            message_target=message_target,
+            require_target=normalized_action in reset_actions,
+        )
+        if target_error == "group_target_required":
+            yield event.plain_result("群管理员请回复或 @ 本群目标用户。")
+            return
+        if target_error == "target_required":
+            yield event.plain_result(
+                "重置时请回复或 @ 目标用户；机器人管理员也可以填写用户 ID。"
+            )
+            return
+        if normalized_action in reset_actions:
+            await self._reset_affinity_state(event.get_platform_name(), target)
+            yield event.plain_result(f"已重置用户 {target} 的好感状态。")
+            return
         state = await self._load_affinity_state(event.get_platform_name(), target)
         stage = relationship_stage(
             state,
@@ -321,15 +345,43 @@ class MentionOnlyChat(Star):
         self._affinity_cache[key] = state
         return state
 
+    async def _reset_affinity_state(
+        self,
+        platform_name: object,
+        sender_id: object,
+    ) -> None:
+        key = affinity_state_key(platform_name, sender_id)
+        state = AffinityState()
+        async with self._affinity_lock:
+            await self.put_kv_data(key, state.to_dict())
+            self._affinity_cache[key] = state
+
     def _can_manage_affinity(self, event: AstrMessageEvent) -> bool:
+        return self._affinity_management_scope(event) != "none"
+
+    def _affinity_management_scope(self, event: AstrMessageEvent) -> str:
         is_admin = False
         with suppress(Exception):
             is_admin = bool(event.is_admin())
-        return can_manage_affinity(
+        return affinity_management_scope(
             event.get_sender_id(),
             is_admin=is_admin,
             manager_ids=self.config.get("affinity_manager_ids", []),
+            is_group_chat=self._is_group_event(event),
+            platform_roles=extract_platform_roles(self._raw_event_data(event)),
         )
+
+    @staticmethod
+    def _is_group_event(event: AstrMessageEvent) -> bool:
+        if bool(event.get_group_id()):
+            return True
+        raw = MentionOnlyChat._raw_event_data(event)
+        return bool(isinstance(raw, dict) and raw.get("group_openid"))
+
+    @staticmethod
+    def _raw_event_data(event: AstrMessageEvent):
+        raw_message = getattr(event.message_obj, "raw_message", None)
+        return getattr(raw_message, "raw_data", raw_message)
 
     @staticmethod
     def _affinity_target(event: AstrMessageEvent) -> str:

@@ -45,7 +45,7 @@
     "default": true
   },
   "affinity_manager_ids": {
-    "description": "Bot administrator sender IDs allowed to query private affinity state.",
+    "description": "Trusted sender IDs allowed to query and reset private affinity state. AstrBot admins and group owner/admin roles are also accepted.",
     "type": "list",
     "default": []
   },
