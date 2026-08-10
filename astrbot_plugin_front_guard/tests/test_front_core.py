@@ -159,6 +159,8 @@ class NaturalCommandTests(unittest.TestCase):
             "抽一下今日小猪",
             "今天是什么小猪",
             "帮我抽个小猪",
+            "@阿尔博特二号机 我是什么猪",
+            "@阿尔博特二号机 我是什么猪？",
         ):
             with self.subTest(message=message):
                 self.assertEqual(
@@ -166,6 +168,7 @@ class NaturalCommandTests(unittest.TestCase):
                     CommandIntent("今日小猪"),
                 )
         self.assertIsNone(match_natural_command("今日小猪插件怎么用"))
+        self.assertIsNone(match_natural_command("你觉得我像什么猪"))
         self.assertIsNone(match_natural_command("我订阅了一个房屋装修博客"))
 
     def test_repairs_accidental_housing_subscription_from_reply(self) -> None:

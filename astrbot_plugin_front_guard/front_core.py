@@ -535,8 +535,11 @@ def _match_daily_pig(text: str) -> CommandIntent | None:
         "今天的小猪",
         "今天是什么小猪",
         "今天是啥小猪",
+        "今天是什么猪",
         "我今天是什么小猪",
         "我今天是啥小猪",
+        "我今天是什么猪",
+        "我是什么猪",
     }:
         return CommandIntent("今日小猪")
     return None
