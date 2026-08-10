@@ -1,7 +1,7 @@
 name: astrbot_plugin_group_memory
 display_name: Group Persistent Memory
 desc: Keeps isolated persistent chat memory for allowlisted QQ groups.
-version: v1.2.0
+version: v1.3.0
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

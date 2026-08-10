@@ -14,6 +14,11 @@
     "type": "int",
     "default": 180
   },
+  "forget_negative_messages": {
+    "description": "Do not retain harassment, hostility, transient negative emotions, or grudge-like replies.",
+    "type": "bool",
+    "default": true
+  },
   "max_message_chars": {
     "description": "Maximum characters stored from each group message or bot reply.",
     "type": "int",

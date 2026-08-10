@@ -10,6 +10,7 @@ This AstrBot plugin stores bounded, isolated conversation memory for each QQ gro
 - Structured mentions, replies, and unambiguous nickname references preserve who is talking to whom.
 - Non-allowlisted groups and private messages are never read or written.
 - Commands and messages that look like credentials are not stored.
+- Harassment, hostility, transient negative emotions, and grudge-like bot replies are not retained. Existing matching records are removed when a group's memory is next loaded.
 - Relevant history and a small recent window are injected as temporary LLM context.
 - `/groupmemory status` shows the current group record count.
 - `/groupmemory clear` clears only the current group and requires elevated permission.

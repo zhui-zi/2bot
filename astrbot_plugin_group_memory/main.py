@@ -17,9 +17,11 @@ from .memory_core import (
     MemoryRecord,
     MemberRelation,
     append_record,
+    filter_durable_records,
     find_nickname_relations,
     is_allowlisted_group,
     looks_sensitive,
+    looks_transient_negative,
     merge_relations,
     normalize_record_text,
     parse_record,
@@ -30,14 +32,14 @@ from .memory_core import (
 )
 
 
-STATE_VERSION = 3
+STATE_VERSION = 4
 
 
 @register(
     "group_persistent_memory",
     "keita",
     "Keeps isolated persistent chat memory for allowlisted QQ groups.",
-    "1.2.0",
+    "1.3.0",
 )
 class GroupPersistentMemory(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -56,7 +58,14 @@ class GroupPersistentMemory(Star):
             event.get_message_str() or "",
             self._max_message_chars(),
         )
-        if not text or looks_sensitive(text):
+        if (
+            not text
+            or looks_sensitive(text)
+            or (
+                self._forget_negative_messages()
+                and looks_transient_negative(text)
+            )
+        ):
             return
         records = await self._load(event)
         relations = self._event_relations(event, text, records)
@@ -145,7 +154,14 @@ class GroupPersistentMemory(Star):
             getattr(response, "completion_text", "") or "",
             self._max_message_chars(),
         )
-        if not text or looks_sensitive(text):
+        if (
+            not text
+            or looks_sensitive(text)
+            or (
+                self._forget_negative_messages()
+                and looks_transient_negative(text)
+            )
+        ):
             return
         await self._append(
             event,
@@ -211,7 +227,17 @@ class GroupPersistentMemory(Star):
             return self._cache[key]
         raw = await self.get_kv_data(self._state_key(key), {"records": []})
         raw_records = raw.get("records", []) if isinstance(raw, dict) else []
-        records = [record for item in raw_records if (record := parse_record(item))]
+        parsed = [record for item in raw_records if (record := parse_record(item))]
+        records = filter_durable_records(
+            parsed,
+            forget_negative=self._forget_negative_messages(),
+        )
+        if len(records) != len(parsed):
+            logger.info(
+                "Pruned %s transient negative group-memory records.",
+                len(parsed) - len(records),
+            )
+            await self.put_kv_data(self._state_key(key), self._serialize(records))
         self._cache[key] = records
         return records
 
@@ -265,6 +291,9 @@ class GroupPersistentMemory(Star):
 
     def _max_message_chars(self) -> int:
         return self._bounded("max_message_chars", 600, 80, 2000)
+
+    def _forget_negative_messages(self) -> bool:
+        return bool(self.config.get("forget_negative_messages", True))
 
     @classmethod
     def _event_relations(

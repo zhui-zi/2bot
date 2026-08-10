@@ -13,14 +13,18 @@ from .active_chat import (
     should_allow_llm_request,
     should_reply,
 )
-from .chat_style import append_natural_chat_style, should_apply_natural_style
+from .chat_style import (
+    append_natural_chat_style,
+    forget_expired_negative_contexts,
+    should_apply_natural_style,
+)
 
 
 @register(
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational.",
-    "1.2.0",
+    "1.3.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -91,8 +95,18 @@ class MentionOnlyChat(Star):
             event.stop_event()
             return
 
+        platform_name = event.get_platform_name()
         if should_apply_natural_style(
-            event.get_platform_name(),
+            platform_name,
+            self.config.get("forget_expired_negative_context", True),
+        ):
+            request.contexts = forget_expired_negative_contexts(
+                request.contexts,
+                keep_recent=self.config.get("recent_negative_context_messages", 4),
+            )
+
+        if should_apply_natural_style(
+            platform_name,
             self.config.get("natural_chat_style", True),
         ):
             request.system_prompt = append_natural_chat_style(request.system_prompt)
