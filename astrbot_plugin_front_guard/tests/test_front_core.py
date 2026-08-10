@@ -92,6 +92,11 @@ class NaturalCommandTests(unittest.TestCase):
         cases = {
             "查询波奇服的物品信息": CommandIntent("物品", "波奇服"),
             "查一下陆行鸟铁矿的市场价": CommandIntent("价格", "陆行鸟铁矿"),
+            "脚夫鸭价格": CommandIntent("价格", "脚夫鸭"),
+            "脚夫鸭笛的价格": CommandIntent("价格", "脚夫鸭笛"),
+            "猪区好运胡萝卜市场价格": CommandIntent(
+                "价格", "猪区好运胡萝卜"
+            ),
             "脚夫鸭笛多少钱": CommandIntent("价格", "脚夫鸭笛"),
             "猪区好运胡萝卜卖多少钱": CommandIntent(
                 "价格", "猪区好运胡萝卜"
@@ -108,6 +113,10 @@ class NaturalCommandTests(unittest.TestCase):
         for message, expected in cases.items():
             with self.subTest(message=message):
                 self.assertEqual(match_natural_command(message), expected)
+
+        for message in ("这个价格", "那个价格", "这个价格合理吗"):
+            with self.subTest(message=message):
+                self.assertIsNone(match_natural_command(message))
 
     def test_routes_common_source_repository_questions(self) -> None:
         for message in (

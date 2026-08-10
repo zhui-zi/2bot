@@ -110,6 +110,9 @@ _LOOKUP_VERB = r"(?:查看|查询|搜索|看看|查|搜)"
 _INVALID_ARGUMENT_RE = re.compile(
     r"^(?:指令|命令|功能|用法|帮助)$|(?:指令|命令|功能)(?:怎么用|如何使用|是什么)?$"
 )
+_INVALID_PRICE_ARGUMENT_RE = re.compile(
+    r"^(?:这|那|这个|那个|它|什么|多少|哪个|哪种|当前|现在|目前)$"
+)
 _PVP_GAMEPLAY_SUBJECT_RE = re.compile(
     r"(?:pvp|战场|纷争前线|水晶冲突|群狼盛宴|尘封[密秘]岩|荣誉野|"
     r"昂萨哈凯尔|边区遗迹群|日影地修炼所|"
@@ -751,6 +754,7 @@ def _match_parameterized_features(text: str) -> CommandIntent | None:
             (
                 rf"{_LEADING_POLITENESS}{_LOOKUP_VERB}(?:一下)?(?:市场板|板子|市场)?(?:价格|物价)[：: ]+(?P<args>.+)",
                 rf"{_LEADING_POLITENESS}{_LOOKUP_VERB}(?:一下)?(?P<args>.+?)(?:的)?(?:市场价|市场板价格|板子价格)",
+                r"(?P<args>.+?)(?:的)?(?:市场板|板子|市场)?价格",
                 r"(?P<args>.+?)(?:现在|目前)?(?:卖|值)?多少钱",
             ),
         ),
@@ -788,5 +792,7 @@ def _match_parameterized_features(text: str) -> CommandIntent | None:
 def _intent_with_arguments(command: str, arguments: str) -> CommandIntent | None:
     value = re.sub(r"\s+", " ", arguments).strip(" ：:，,。.!！?")
     if not value or _INVALID_ARGUMENT_RE.fullmatch(value):
+        return None
+    if command == "价格" and _INVALID_PRICE_ARGUMENT_RE.fullmatch(value):
         return None
     return CommandIntent(command, value)
