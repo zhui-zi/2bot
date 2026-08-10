@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import random
+import time
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -13,6 +15,14 @@ from .active_chat import (
     should_allow_llm_request,
     should_reply,
 )
+from .affinity import (
+    AffinityState,
+    advance_affinity,
+    affinity_state_key,
+    append_relationship_guidance,
+    parse_affinity_state,
+    relationship_stage,
+)
 from .chat_style import (
     append_natural_chat_style,
     forget_expired_negative_contexts,
@@ -23,13 +33,15 @@ from .chat_style import (
 @register(
     "mention_only_chat",
     "keita",
-    "Gates direct chat and keeps QQ replies conversational.",
-    "1.3.0",
+    "Gates direct chat and keeps QQ replies conversational and relational.",
+    "1.4.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
+        self._affinity_lock = asyncio.Lock()
+        self._affinity_cache: dict[str, AffinityState] = {}
 
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=-100)
     async def maybe_join_group_chat(self, event: AstrMessageEvent):
@@ -98,6 +110,22 @@ class MentionOnlyChat(Star):
         platform_name = event.get_platform_name()
         if should_apply_natural_style(
             platform_name,
+            self.config.get("hidden_affinity_enabled", True),
+        ):
+            state = await self._relationship_state(event)
+            if state is not None:
+                request.system_prompt = append_relationship_guidance(
+                    request.system_prompt,
+                    relationship_stage(
+                        state,
+                        romance_enabled=bool(
+                            self.config.get("hidden_romance_enabled", True)
+                        ),
+                    ),
+                )
+
+        if should_apply_natural_style(
+            platform_name,
             self.config.get("forget_expired_negative_context", True),
         ):
             request.contexts = forget_expired_negative_contexts(
@@ -110,6 +138,42 @@ class MentionOnlyChat(Star):
             self.config.get("natural_chat_style", True),
         ):
             request.system_prompt = append_natural_chat_style(request.system_prompt)
+
+    async def _relationship_state(
+        self,
+        event: AstrMessageEvent,
+    ) -> AffinityState | None:
+        sender_id = str(event.get_sender_id() or "").strip()
+        if not sender_id or sender_id == str(event.get_self_id() or "").strip():
+            return None
+        key = affinity_state_key(event.get_platform_name(), sender_id)
+        direct_interaction = bool(event.is_private_chat()) or self._targets_bot(event)
+        async with self._affinity_lock:
+            if key in self._affinity_cache:
+                state = self._affinity_cache[key]
+            else:
+                raw = await self.get_kv_data(key, {})
+                state = parse_affinity_state(raw)
+            updated = state
+            if direct_interaction:
+                updated = advance_affinity(
+                    state,
+                    event.get_message_str() or "",
+                    now=time.time(),
+                    min_award_minutes=self.config.get(
+                        "affinity_min_award_minutes",
+                        20,
+                    ),
+                    daily_gain_cap=self.config.get("affinity_daily_gain_cap", 6),
+                    inactivity_grace_days=self.config.get(
+                        "affinity_inactivity_grace_days",
+                        45,
+                    ),
+                )
+            if updated != state:
+                await self.put_kv_data(key, updated.to_dict())
+            self._affinity_cache[key] = updated
+            return updated
 
     @staticmethod
     def _targets_bot(event: AstrMessageEvent) -> bool:

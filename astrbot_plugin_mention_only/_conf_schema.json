@@ -23,5 +23,30 @@
     "description": "Recent context messages allowed to retain short-term negative context, from 0 to 20.",
     "type": "int",
     "default": 4
+  },
+  "hidden_affinity_enabled": {
+    "description": "Use private per-user affinity to adjust relationship warmth without exposing scores.",
+    "type": "bool",
+    "default": true
+  },
+  "hidden_romance_enabled": {
+    "description": "Allow restrained romance after sustained affinity and repeated explicit romantic interest.",
+    "type": "bool",
+    "default": true
+  },
+  "affinity_min_award_minutes": {
+    "description": "Minimum minutes between affinity awards for one user, from 0 to 1440.",
+    "type": "int",
+    "default": 20
+  },
+  "affinity_daily_gain_cap": {
+    "description": "Maximum affinity gained by one user per UTC day, from 0 to 20.",
+    "type": "int",
+    "default": 6
+  },
+  "affinity_inactivity_grace_days": {
+    "description": "Inactive days before affinity begins a slow decay toward neutral.",
+    "type": "int",
+    "default": 45
   }
 }

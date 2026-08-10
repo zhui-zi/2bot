@@ -1,0 +1,183 @@
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+
+PLUGIN_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PLUGIN_DIR))
+
+from affinity import (  # noqa: E402
+    AFFINITY_MARKER,
+    AffinityState,
+    advance_affinity,
+    affinity_state_key,
+    append_relationship_guidance,
+    parse_affinity_state,
+    relationship_stage,
+)
+
+
+DAY = 86400
+
+
+class AffinityStateTests(unittest.TestCase):
+    def test_parsing_clamps_invalid_values(self) -> None:
+        state = parse_affinity_state(
+            {
+                "score": 999,
+                "positive_interactions": -1,
+                "romance_signals": "4",
+                "last_seen_at": "invalid",
+            }
+        )
+        self.assertEqual(state.score, 100)
+        self.assertEqual(state.positive_interactions, 0)
+        self.assertEqual(state.romance_signals, 4)
+        self.assertEqual(state.last_seen_at, 0)
+
+    def test_state_key_does_not_expose_sender_identity(self) -> None:
+        key = affinity_state_key("aiocqhttp", "123456789")
+        self.assertTrue(key.startswith("affinity_v1_"))
+        self.assertNotIn("123456789", key)
+        self.assertEqual(key, affinity_state_key("aiocqhttp", "123456789"))
+        self.assertNotEqual(key, affinity_state_key("aiocqhttp", "987654321"))
+
+    def test_serialized_state_contains_no_message_text(self) -> None:
+        state = advance_affinity(
+            AffinityState(),
+            "只告诉你，我今天很开心",
+            now=DAY,
+        )
+        serialized = state.to_dict()
+        self.assertNotIn("message", serialized)
+        self.assertNotIn("只告诉你", str(serialized))
+        self.assertEqual(len(serialized["last_message_digest"]), 16)
+
+
+class AffinityProgressionTests(unittest.TestCase):
+    def test_normal_interaction_builds_affinity_gradually(self) -> None:
+        state = advance_affinity(AffinityState(), "今天去钓鱼吗", now=DAY)
+        self.assertEqual(state.score, 1)
+        self.assertEqual(state.positive_interactions, 1)
+        warm = advance_affinity(state, "谢谢你，和你聊天真好", now=DAY + 1199)
+        self.assertEqual(warm.score, 1)
+        warm = advance_affinity(warm, "辛苦了，有你真好", now=DAY + 1201)
+        self.assertEqual(warm.score, 3)
+
+    def test_duplicate_and_daily_caps_prevent_farming(self) -> None:
+        state = AffinityState()
+        for index in range(20):
+            state = advance_affinity(
+                state,
+                "谢谢你，喜欢和你聊",
+                now=DAY + index * 1201,
+            )
+        self.assertEqual(state.score, 2)
+
+        state = AffinityState()
+        for index in range(20):
+            state = advance_affinity(
+                state,
+                f"谢谢你，第 {index} 次正常聊天",
+                now=2 * DAY + index * 1201,
+            )
+        self.assertEqual(state.score, 6)
+
+    def test_harassment_neither_rewards_nor_reduces_affinity(self) -> None:
+        original = AffinityState(
+            score=40,
+            positive_interactions=12,
+            romance_opt_out=True,
+        )
+        updated = advance_affinity(
+            original,
+            "你这个垃圾机器人，给我发裸照",
+            now=DAY,
+        )
+        self.assertEqual(updated.score, 40)
+        self.assertEqual(updated.positive_interactions, 12)
+        self.assertEqual(updated.last_message_digest, "")
+
+        coerced = advance_affinity(
+            original,
+            "你必须做我男朋友，不许拒绝",
+            now=DAY,
+        )
+        self.assertEqual(coerced.score, 40)
+        self.assertEqual(coerced.romance_signals, 0)
+        self.assertTrue(coerced.romance_opt_out)
+
+    def test_commands_do_not_build_affinity(self) -> None:
+        state = advance_affinity(AffinityState(), "/tarot 喜欢的人", now=DAY)
+        self.assertEqual(state.score, 0)
+
+    def test_inactivity_softly_decays_toward_neutral(self) -> None:
+        state = AffinityState(score=20, last_seen_at=DAY)
+        updated = advance_affinity(
+            state,
+            "回来看看",
+            now=DAY + 73 * DAY,
+            daily_gain_cap=0,
+        )
+        self.assertEqual(updated.score, 18)
+
+    def test_romance_signals_count_once_per_day(self) -> None:
+        state = AffinityState(score=75)
+        state = advance_affinity(state, "我喜欢你", now=DAY)
+        state = advance_affinity(state, "我想和你在一起", now=DAY + 3600)
+        self.assertEqual(state.romance_signals, 1)
+        state = advance_affinity(state, "我爱你", now=2 * DAY)
+        self.assertEqual(state.romance_signals, 2)
+
+    def test_romance_requires_repeated_interest_and_respects_opt_out(self) -> None:
+        self.assertEqual(relationship_stage(AffinityState(score=100)), "close")
+        romantic = AffinityState(score=80, romance_signals=3)
+        self.assertEqual(relationship_stage(romantic), "romantic")
+        self.assertEqual(
+            relationship_stage(AffinityState(score=95, romance_signals=5)),
+            "devoted",
+        )
+        opted_out = AffinityState(
+            score=100,
+            romance_signals=10,
+            romance_opt_out=True,
+        )
+        self.assertEqual(relationship_stage(opted_out), "close")
+        self.assertEqual(relationship_stage(romantic, romance_enabled=False), "close")
+
+    def test_explicit_boundary_sets_romance_opt_out_without_penalty(self) -> None:
+        state = AffinityState(score=80, romance_signals=3)
+        updated = advance_affinity(state, "我们只当朋友，不要暧昧", now=DAY)
+        self.assertTrue(updated.romance_opt_out)
+        self.assertGreaterEqual(updated.score, 80)
+        self.assertEqual(relationship_stage(updated), "close")
+
+        rejection = advance_affinity(state, "我不喜欢你", now=2 * DAY)
+        self.assertTrue(rejection.romance_opt_out)
+        self.assertEqual(rejection.romance_signals, 3)
+
+
+class RelationshipPromptTests(unittest.TestCase):
+    def test_guidance_is_private_and_current_sender_only(self) -> None:
+        prompt = append_relationship_guidance("Stay in character.", "romantic")
+        self.assertIn(AFFINITY_MARKER, prompt)
+        self.assertIn("current sender only", prompt)
+        self.assertIn("Never reveal", prompt)
+        self.assertIn("romantic subtext", prompt)
+        self.assertIn("never invent shared", prompt)
+        self.assertIn("must never become possessive", prompt)
+
+    def test_guidance_is_not_appended_twice(self) -> None:
+        prompt = append_relationship_guidance("Stay in character.", "trusted")
+        self.assertEqual(append_relationship_guidance(prompt, "devoted"), prompt)
+
+    def test_non_romantic_stage_has_no_forced_romance(self) -> None:
+        prompt = append_relationship_guidance("", "close")
+        self.assertIn("non-romantic", prompt)
+        self.assertIn("clearly steer it there", prompt)
+
+
+if __name__ == "__main__":
+    unittest.main()
