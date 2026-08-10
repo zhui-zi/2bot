@@ -19,6 +19,7 @@ _FF14_MARKERS = (
     "ff14", "ffxiv", "最终幻想14", "最终幻想xiv", "光之战士", "豆芽",
     "副本", "迷宫", "讨伐战", "歼灭战", "零式", "绝本", "职业",
     "pvp", "战场", "纷争前线", "水晶冲突", "狼狱停船场",
+    "昂萨", "碎冰", "尘封秘岩",
     "装等", "装备", "主线", "任务搜索器", "gcd", "lb", "dps",
     "坦克", "奶妈", "治疗", "仇恨", "极限技", "复活", "坐骑", "陆行鸟",
     "传送", "以太之光", "诗学", "军票", "雇员", "魔晶石", "染色",
@@ -88,6 +89,11 @@ class KnowledgeIndex:
                 score += 80.0
             score += _boss_section_bonus(normalized_query, normalized_heading)
             score += _variant_bonus(normalized_query, normalized_title)
+            if chunk.document_id.startswith("curated/pvp/") and any(
+                marker in normalized_query
+                for marker in ("pvp", "战场", "纷争前线", "水晶冲突", "昂萨", "碎冰")
+            ):
+                score += 250.0
             if chunk.category == "duty" and any(
                 marker in normalized_query
                 for marker in ("副本", "迷宫", "讨伐", "歼灭", "boss", "老一", "老二", "老三")

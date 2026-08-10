@@ -20,6 +20,7 @@ class PvpKnowledgeTests(unittest.TestCase):
     def test_generic_pvp_query_retrieves_setup_guidance(self) -> None:
         selected = self.index.search("PVP怎么玩？")
         self.assertTrue(selected)
+        self.assertEqual(selected[0].document_id, "curated/pvp/general")
         self.assertTrue(any("PvP" in chunk.title for chunk in selected))
         rendered = render_context(selected)
         self.assertIn("狼狱停船场", rendered)
@@ -42,6 +43,10 @@ class PvpKnowledgeTests(unittest.TestCase):
     def test_crystalline_conflict_query_retrieves_push_guidance(self) -> None:
         selected = self.index.search("水晶冲突打赢团战后做什么？")
         self.assertTrue(selected)
+        self.assertEqual(
+            selected[0].document_id,
+            "curated/pvp/crystalline-conflict",
+        )
         self.assertIn(
             "curated/pvp/crystalline-conflict",
             {chunk.document_id for chunk in selected},
