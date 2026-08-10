@@ -12,6 +12,7 @@ from active_chat import (  # noqa: E402
     is_active_reply_candidate,
     normalize_reply_percent,
     should_allow_llm_request,
+    should_quote_group_reply,
     should_reply,
 )
 
@@ -27,6 +28,29 @@ class ReplyPercentTests(unittest.TestCase):
         self.assertFalse(should_reply(0, 0))
         self.assertTrue(should_reply(30, 0.2999))
         self.assertFalse(should_reply(30, 0.3))
+
+    def test_quotes_only_snowluma_group_messages_with_ids(self) -> None:
+        self.assertTrue(
+            should_quote_group_reply(
+                platform_name="aiocqhttp",
+                is_group_chat=True,
+                message_id="123",
+            )
+        )
+        self.assertFalse(
+            should_quote_group_reply(
+                platform_name="qq_official",
+                is_group_chat=True,
+                message_id="123",
+            )
+        )
+        self.assertFalse(
+            should_quote_group_reply(
+                platform_name="aiocqhttp",
+                is_group_chat=False,
+                message_id="123",
+            )
+        )
 
 
 class CandidateTests(unittest.TestCase):

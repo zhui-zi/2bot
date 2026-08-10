@@ -40,6 +40,19 @@ def should_reply(percent: object, random_sample: float) -> bool:
     return random_sample < normalize_reply_percent(percent) / 100.0
 
 
+def should_quote_group_reply(
+    *,
+    platform_name: object,
+    is_group_chat: object,
+    message_id: object,
+) -> bool:
+    return (
+        str(platform_name or "").strip().casefold() == "aiocqhttp"
+        and bool(is_group_chat)
+        and bool(str(message_id or "").strip())
+    )
+
+
 def should_allow_llm_request(
     *,
     platform_name: str,

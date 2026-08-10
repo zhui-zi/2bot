@@ -9,6 +9,11 @@
       "step": 1
     }
   },
+  "quote_group_replies": {
+    "description": "Quote the triggering group message on OneBot so concurrent replies stay visibly anchored.",
+    "type": "bool",
+    "default": true
+  },
   "natural_chat_style": {
     "description": "Keep QQ replies concise and conversational instead of assistant-like.",
     "type": "bool",

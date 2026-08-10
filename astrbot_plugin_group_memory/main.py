@@ -17,6 +17,7 @@ from .memory_core import (
     MemoryRecord,
     MemberRelation,
     append_record,
+    filter_identity_bound_contexts,
     filter_durable_records,
     find_nickname_relations,
     is_allowlisted_group,
@@ -27,6 +28,7 @@ from .memory_core import (
     parse_record,
     render_context,
     render_current_speaker,
+    render_current_turn,
     render_group_roster,
     select_records,
 )
@@ -39,7 +41,7 @@ STATE_VERSION = 4
     "group_persistent_memory",
     "keita",
     "Keeps isolated persistent chat memory for allowlisted QQ groups.",
-    "1.3.0",
+    "1.4.0",
 )
 class GroupPersistentMemory(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -91,22 +93,42 @@ class GroupPersistentMemory(Star):
             return
         if event.get_extra("_mention_only_llm_allow") == "tarot_reading":
             return
+        if self.config.get("drop_ambiguous_native_context", True):
+            request.contexts = filter_identity_bound_contexts(request.contexts)
         current_sender_id = str(event.get_sender_id() or "")
         current_sender_name = self._sender_name(event)
+        original_prompt = str(request.prompt or "")
+        query_parts = [original_prompt]
+        current_text = ""
+        with suppress(Exception):
+            current_text = normalize_record_text(event.get_message_str() or "", 1000)
+            query_parts.append(current_text)
+        records = await self._load(event)
+        current_record_matches = bool(
+            current_text
+            and records
+            and records[-1].role == "user"
+            and records[-1].sender_id == current_sender_id
+            and records[-1].text == current_text
+        )
+        if current_record_matches:
+            current_relations = records[-1].relations
+        else:
+            current_relations = self._event_relations(event, current_text, records)
+        request.prompt = render_current_turn(
+            current_sender_id,
+            current_sender_name,
+            original_prompt or current_text,
+            relations=current_relations,
+        )
         request.extra_user_content_parts.append(
             TextPart(
                 text=render_current_speaker(
                     current_sender_id,
                     current_sender_name,
                 )
-            )
+            ).mark_as_temp()
         )
-        query_parts = [str(request.prompt or "")]
-        current_text = ""
-        with suppress(Exception):
-            current_text = normalize_record_text(event.get_message_str() or "", 1000)
-            query_parts.append(current_text)
-        records = await self._load(event)
         roster_text = render_group_roster(
             records,
             current_sender_id=current_sender_id,
@@ -117,13 +139,7 @@ class GroupPersistentMemory(Star):
             request.extra_user_content_parts.append(
                 TextPart(text=roster_text).mark_as_temp()
             )
-        if (
-            current_text
-            and records
-            and records[-1].role == "user"
-            and records[-1].sender_id == current_sender_id
-            and records[-1].text == current_text
-        ):
+        if current_record_matches:
             records = records[:-1]
         selected = select_records(
             records,

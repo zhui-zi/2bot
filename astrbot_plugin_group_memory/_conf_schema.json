@@ -19,6 +19,11 @@
     "type": "bool",
     "default": true
   },
+  "drop_ambiguous_native_context": {
+    "description": "Exclude legacy group conversation turns that have no stable member identity label.",
+    "type": "bool",
+    "default": true
+  },
   "max_message_chars": {
     "description": "Maximum characters stored from each group message or bot reply.",
     "type": "int",

@@ -9,13 +9,15 @@ from zoneinfo import ZoneInfo
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.message_components import At, Reply
+from astrbot.api.message_components import At, Plain, Reply
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
+from astrbot.core.message.message_event_result import MessageChain
 
 from .active_chat import (
     is_active_reply_candidate,
     should_allow_llm_request,
+    should_quote_group_reply,
     should_reply,
 )
 from .affinity import (
@@ -41,7 +43,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.5.0",
+    "1.6.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -192,6 +194,36 @@ class MentionOnlyChat(Star):
         if compacted and compacted != response.completion_text:
             response.completion_text = compacted
 
+    @filter.on_llm_response(priority=-100)
+    async def quote_group_reply_target(
+        self,
+        event: AstrMessageEvent,
+        response: LLMResponse,
+    ) -> None:
+        message_id = str(getattr(event.message_obj, "message_id", "") or "").strip()
+        if not self.config.get("quote_group_replies", True):
+            return
+        if not should_quote_group_reply(
+            platform_name=event.get_platform_name(),
+            is_group_chat=bool(event.get_group_id()),
+            message_id=message_id,
+        ):
+            return
+        reply = Reply(
+            id=message_id,
+            sender_id=str(event.get_sender_id() or ""),
+            sender_nickname=self._sender_name(event),
+        )
+        if response.result_chain:
+            if not any(
+                isinstance(component, Reply)
+                for component in response.result_chain.chain
+            ):
+                response.result_chain.chain.insert(0, reply)
+            return
+        text = str(response.completion_text or "")
+        response.result_chain = MessageChain([reply, Plain(text)])
+
     @filter.command("affinity", alias={"好感管理"}, priority=900)
     async def affinity_admin(
         self,
@@ -312,6 +344,16 @@ class MentionOnlyChat(Star):
                 if sender_id and sender_id not in {"all", self_id}:
                     return sender_id
         return ""
+
+    @staticmethod
+    def _sender_name(event: AstrMessageEvent) -> str:
+        getter = getattr(event, "get_sender_name", None)
+        if callable(getter):
+            with suppress(Exception):
+                name = str(getter() or "").strip()
+                if name:
+                    return name[:50]
+        return "群成员"
 
     @staticmethod
     def _targets_bot(event: AstrMessageEvent) -> bool:

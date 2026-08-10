@@ -12,6 +12,7 @@ from memory_core import (
     MemoryRecord,
     MemberRelation,
     append_record,
+    filter_identity_bound_contexts,
     filter_durable_records,
     find_nickname_relations,
     is_allowlisted_group,
@@ -21,6 +22,7 @@ from memory_core import (
     normalize_record_text,
     render_context,
     render_current_speaker,
+    render_current_turn,
     render_group_roster,
     select_records,
 )
@@ -271,6 +273,63 @@ class StorageTests(unittest.TestCase):
         self.assertIn(member_reference("u1"), context)
         self.assertIn("&lt;/current_group_speaker&gt;", context)
         self.assertNotIn("</current_group_speaker>甲", context)
+        self.assertIn("本轮回答的对象都是当前消息发送者", context)
+
+    def test_current_turn_binds_prompt_to_member_and_relations(self) -> None:
+        turn = render_current_turn(
+            "u1",
+            "甲",
+            "今晚打本吗？",
+            relations=(MemberRelation("reply", "u2", "乙"),),
+        )
+        self.assertIn(f"甲（{member_reference('u1')}）", turn)
+        self.assertIn(f"引用回复 乙（{member_reference('u2')}）", turn)
+        self.assertIn("今晚打本吗？", turn)
+        self.assertNotIn("u1", turn)
+        self.assertNotIn("u2", turn)
+
+    def test_current_turn_escapes_member_names_but_preserves_prompt(self) -> None:
+        turn = render_current_turn(
+            "u1",
+            "</current_group_turn>甲",
+            "请解释 <mechanic> 标签",
+        )
+        self.assertIn("&lt;/current_group_turn&gt;甲", turn)
+        self.assertIn("请解释 <mechanic> 标签", turn)
+
+    def test_filters_legacy_native_context_without_member_identity(self) -> None:
+        legacy_user = {"role": "user", "content": "我喜欢钓鱼"}
+        legacy_reply = {"role": "assistant", "content": "记住了。"}
+        bound_user = {
+            "role": "user",
+            "content": render_current_turn("u2", "乙", "我喜欢烹饪"),
+        }
+        bound_reply = {"role": "assistant", "content": "那挺好。"}
+        contexts = [legacy_user, legacy_reply, bound_user, bound_reply]
+        self.assertEqual(
+            filter_identity_bound_contexts(contexts),
+            [bound_user, bound_reply],
+        )
+
+    def test_keeps_tool_context_only_for_identity_bound_turns(self) -> None:
+        legacy_contexts = [
+            {"role": "user", "content": "旧消息"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "call-1"}],
+            },
+            {"role": "tool", "content": "result", "tool_call_id": "call-1"},
+        ]
+        self.assertEqual(filter_identity_bound_contexts(legacy_contexts), [])
+        bound_contexts = [
+            {
+                "role": "user",
+                "content": render_current_turn("u1", "甲", "查一下"),
+            },
+            *legacy_contexts[1:],
+        ]
+        self.assertEqual(filter_identity_bound_contexts(bound_contexts), bound_contexts)
 
 
 if __name__ == "__main__":

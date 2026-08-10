@@ -4,6 +4,8 @@ This AstrBot plugin stores bounded, isolated conversation memory for each QQ gro
 
 - Group memories never cross group boundaries.
 - Members in the same group share context but retain distinct stable identities.
+- Every native conversation turn is prefixed with the current member's anonymous identity, so rapid messages from different members cannot inherit the previous speaker's identity or relationship tone.
+- Legacy native conversation turns without a member identity prefix are excluded from model input without deleting stored conversation data.
 - Each request names the current speaker, and bot replies retain their target member.
 - Retrieval mixes shared group context with recent records involving the current member.
 - A temporary roster maps observed group nicknames to anonymous stable member references.

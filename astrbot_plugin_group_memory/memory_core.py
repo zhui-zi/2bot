@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+CURRENT_TURN_MARKER = "<current_group_turn>"
 _CJK_RE = re.compile(r"[\u3400-\u9fff]+")
 _LATIN_RE = re.compile(r"[a-z0-9][a-z0-9._+-]*")
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -400,8 +401,81 @@ def render_current_speaker(sender_id: object, sender_name: object) -> str:
             "同群成员共享群聊上下文，但每个成员是不同的人。请按成员引用区分其身份、经历、偏好、关系和承诺。",
             "群聊上下文中形如“[群昵称/时间]”的前缀表示该昵称成员在发言；结合群昵称、@、引用和上下文判断成员之间在对谁说话。",
             "不要把其他成员说过的话、个人信息或与机器人的互动归到当前成员名下。",
+            "无论历史上下文最后由谁发言，本轮回答的对象都是当前消息发送者。不要沿用上一位成员的称呼、身份或关系语气。",
             "</current_group_speaker>",
         )
+    )
+
+
+def render_current_turn(
+    sender_id: object,
+    sender_name: object,
+    prompt: object,
+    *,
+    relations: tuple[MemberRelation, ...] = (),
+) -> str:
+    label = escape(speaker_label(sender_id, sender_name))
+    lines = [
+        CURRENT_TURN_MARKER,
+        f"本轮发言人及机器人回复对象：{label}",
+        "下面紧接着的内容属于这位成员，不属于历史中的上一位发言人。",
+    ]
+    relation_parts: list[str] = []
+    for relation in relations:
+        if relation.member_id:
+            target = escape(speaker_label(relation.member_id, relation.member_name))
+        else:
+            target = escape(relation.member_name or "未知成员") + "（身份未确定）"
+        if relation.kind == "reply":
+            relation_parts.append(f"引用回复 {target}")
+        elif relation.kind == "at":
+            relation_parts.append(f"@ {target}")
+        else:
+            relation_parts.append(f"提到 {target}")
+    if relation_parts:
+        lines.append("本轮结构化关系：" + "；".join(relation_parts))
+    lines.extend(
+        (
+            "只把当前发言人的个人事实、偏好、好感和承诺归到该成员名下。",
+            "</current_group_turn>",
+            str(prompt or ""),
+        )
+    )
+    return "\n".join(lines)
+
+
+def filter_identity_bound_contexts(contexts: object) -> list[dict]:
+    if not isinstance(contexts, list):
+        return []
+    filtered: list[dict] = []
+    keep_plain_turn = False
+    for context in contexts:
+        if not isinstance(context, dict):
+            continue
+        role = context.get("role")
+        if role == "user":
+            keep_plain_turn = CURRENT_TURN_MARKER in _context_text(context)
+            if keep_plain_turn:
+                filtered.append(context)
+            continue
+        if role in {"assistant", "tool"}:
+            if keep_plain_turn:
+                filtered.append(context)
+            continue
+        filtered.append(context)
+    return filtered
+
+
+def _context_text(context: dict) -> str:
+    content = context.get("content", "")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    return " ".join(
+        str(part.get("text", ""))
+        for part in content
+        if isinstance(part, dict) and part.get("type") == "text"
     )
 
 
