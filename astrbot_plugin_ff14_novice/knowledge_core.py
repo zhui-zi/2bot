@@ -123,6 +123,17 @@ class KnowledgeIndex:
                 item for item in ranked
                 if item[3].document_id in pvp_document_ids
             ]
+        else:
+            strong_document_ids = {
+                item[3].document_id
+                for item in ranked
+                if _query_contains_title_sequence(normalized_query, item[3].title)
+            }
+            if strong_document_ids:
+                ranked = [
+                    item for item in ranked
+                    if item[3].document_id in strong_document_ids
+                ]
 
         selected: list[KnowledgeChunk] = []
         used_chars = 0
@@ -179,6 +190,12 @@ def _query_matches_pvp_topic(normalized_query: str, title: str) -> bool:
         for marker in ("pvp", "战场", "纷争前线", "水晶冲突", "昂萨哈凯尔")
     )
 
+
+def _query_contains_title_sequence(normalized_query: str, title: str) -> bool:
+    return any(
+        len(sequence) >= 3 and sequence in normalized_query
+        for sequence in _CJK_RE.findall(normalize_text(title))
+    )
 
 
 def _boss_section_bonus(normalized_query: str, normalized_heading: str) -> float:

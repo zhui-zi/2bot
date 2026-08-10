@@ -51,6 +51,18 @@ class KnowledgeCoreTests(unittest.TestCase):
         self.assertIn("波奇服", rendered)
         self.assertNotIn("huijiwiki.com", rendered)
 
+    def test_dancing_mad_question_retrieves_current_ultimate(self) -> None:
+        selected = self.index.search("怎么打绝妖星")
+        self.assertTrue(selected)
+        self.assertEqual(selected[0].title, "绝妖星乱舞（绝妖星）")
+        self.assertEqual(len(selected), 1)
+        self.assertIn("不是绝神兵破坏作战", selected[0].text)
+
+    def test_dancing_mad_context_rejects_other_ultimate_mechanics(self) -> None:
+        rendered = render_context(self.index.search("绝妖星怎么打？"))
+        self.assertIn("先询问用户卡在哪个阶段", rendered)
+        self.assertIn("风神、土神等绝神兵机制与本副本无关", rendered)
+
     def test_rendered_context_hides_sources(self) -> None:
         rendered = render_context(self.index.search("沙斯塔夏副本攻略"))
         self.assertIn("<ff14_novice_knowledge>", rendered)
