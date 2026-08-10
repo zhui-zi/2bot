@@ -23,7 +23,9 @@ from front_core import (
     is_pvp_gameplay_question,
     is_prompt_injection,
     match_natural_command,
+    match_reply_correction,
     parse_classifier_output,
+    protect_housing_intent,
 )
 
 
@@ -59,6 +61,10 @@ class NaturalCommandTests(unittest.TestCase):
             "查询本轮紫水栈桥M个人空房": CommandIntent(
                 "ff14push",
                 "house now 查询本轮紫水栈桥m个人空房",
+            ),
+            "查一下海猫茶屋房": CommandIntent(
+                "ff14push",
+                "house now 海猫茶屋",
             ),
             "看看这个群记住了多少内容": CommandIntent("groupmemory", "status"),
             "本周时尚品鉴怎么搭配": CommandIntent("暖暖"),
@@ -136,6 +142,32 @@ class NaturalCommandTests(unittest.TestCase):
                 )
         self.assertIsNone(match_natural_command("今日小猪插件怎么用"))
         self.assertIsNone(match_natural_command("我订阅了一个房屋装修博客"))
+
+    def test_repairs_accidental_housing_subscription_from_reply(self) -> None:
+        quoted = (
+            "国服空闲房区推送已开启。\n"
+            "服务器：海猫茶屋；房型：S/M/L；资格：个人/部队均可抽\n"
+            "将在下一轮申请期开始后推送。"
+        )
+        self.assertEqual(
+            match_reply_correction("不是推送", quoted),
+            CommandIntent(
+                "ff14push",
+                "house now 服务器：海猫茶屋；房型：S/M/L；资格：个人/部队均可抽",
+            ),
+        )
+        self.assertIsNone(match_reply_correction("不是推送", "普通聊天回复"))
+
+    def test_requires_explicit_opt_in_for_housing_subscription(self) -> None:
+        classifier_intent = CommandIntent("ff14push", "house on 海猫茶屋 all all")
+        self.assertEqual(
+            protect_housing_intent("查一下海猫茶屋房", classifier_intent),
+            CommandIntent("ff14push", "house now 海猫茶屋 all all"),
+        )
+        self.assertEqual(
+            protect_housing_intent("订阅海猫茶屋空房推送", classifier_intent),
+            classifier_intent,
+        )
 
     def test_pvp_gameplay_questions_stay_in_chat(self) -> None:
         messages = (

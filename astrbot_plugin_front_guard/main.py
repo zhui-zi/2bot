@@ -10,6 +10,7 @@ from typing import Any
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.message_components import Reply
 from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.platform.astr_message_event import AstrMessageEvent as CoreEvent
@@ -37,7 +38,9 @@ from .front_core import (
     is_pvp_gameplay_question,
     is_prompt_injection,
     match_natural_command,
+    match_reply_correction,
     parse_classifier_output,
+    protect_housing_intent,
 )
 
 
@@ -48,7 +51,7 @@ DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.3.3",
+    "1.3.4",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -121,7 +124,9 @@ class UnifiedFrontGuard(Star):
             event.set_extra("_front_guard_checked", "local")
             return
 
-        intent = match_natural_command(message)
+        intent = match_reply_correction(message, self._quoted_bot_message(event))
+        if intent is None:
+            intent = match_natural_command(message)
         classification: FrontClassification | None = None
         if intent is None and self._classifier_enabled():
             classification = await self._classify(message)
@@ -135,11 +140,25 @@ class UnifiedFrontGuard(Star):
                 self._command_confidence(),
             )
 
+        intent = protect_housing_intent(message, intent)
+
         event.set_extra("_front_guard_checked", "flash" if classification else "local")
         if intent is None:
             return
         async for result in self._dispatch(event, intent):
             yield result
+
+    @staticmethod
+    def _quoted_bot_message(event: AstrMessageEvent) -> str:
+        self_id = str(event.get_self_id() or "")
+        for component in event.get_messages():
+            if not isinstance(component, Reply):
+                continue
+            sender_id = str(getattr(component, "sender_id", "") or "")
+            if self_id and sender_id and sender_id != self_id:
+                continue
+            return str(getattr(component, "message_str", "") or "")
+        return ""
 
     @filter.on_llm_request(priority=900)
     async def protect_llm_request(
