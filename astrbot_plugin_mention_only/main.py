@@ -13,13 +13,14 @@ from .active_chat import (
     should_allow_llm_request,
     should_reply,
 )
+from .chat_style import append_natural_chat_style, should_apply_natural_style
 
 
 @register(
     "mention_only_chat",
     "keita",
-    "Gates direct chat and occasionally joins QQ group conversations.",
-    "1.1.1",
+    "Gates direct chat and keeps QQ replies conversational.",
+    "1.2.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -79,7 +80,7 @@ class MentionOnlyChat(Star):
     async def require_direct_mention(
         self,
         event: AstrMessageEvent,
-        _request: ProviderRequest,
+        request: ProviderRequest,
     ) -> None:
         if not should_allow_llm_request(
             platform_name=str(event.get_platform_name() or ""),
@@ -88,6 +89,13 @@ class MentionOnlyChat(Star):
             allow_reason=str(event.get_extra("_mention_only_llm_allow") or ""),
         ):
             event.stop_event()
+            return
+
+        if should_apply_natural_style(
+            event.get_platform_name(),
+            self.config.get("natural_chat_style", True),
+        ):
+            request.system_prompt = append_natural_chat_style(request.system_prompt)
 
     @staticmethod
     def _targets_bot(event: AstrMessageEvent) -> bool:

@@ -8,5 +8,10 @@
       "max": 30,
       "step": 1
     }
+  },
+  "natural_chat_style": {
+    "description": "Keep QQ replies concise and conversational instead of assistant-like.",
+    "type": "bool",
+    "default": true
   }
 }
