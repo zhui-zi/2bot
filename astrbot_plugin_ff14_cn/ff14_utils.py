@@ -6,19 +6,12 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
-from typing import Any, Iterable
+from typing import Any
 from xml.etree import ElementTree
 from zoneinfo import ZoneInfo
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
-PERMISSION_MEMBER = 0
-PERMISSION_GROUP_MANAGER = 10
-PERMISSION_CONFIGURED_MANAGER = 20
-PERMISSION_BOT_AUTHOR = 30
-KNOWN_MANAGER_ROLES = frozenset(
-    {"admin", "administrator", "owner", "群主", "管理员"}
-)
 BATTLEFIELD_ANCHOR = datetime(2026, 4, 28, 23, 0, tzinfo=SHANGHAI_TZ)
 BATTLEFIELD_ROTATION = (
     ("阵地", "周边遗迹群（阵地战）"),
@@ -68,37 +61,6 @@ def resolve_qq_scene(
     if is_group_chat:
         return "group"
     return "friend" if is_private_chat else ""
-
-
-def resolve_permission_rank(
-    sender_id: object,
-    *,
-    is_astrbot_admin: bool,
-    bot_author_ids: Iterable[object] = (),
-    configured_manager_ids: Iterable[object] = (),
-    platform_roles: Iterable[object] = (),
-) -> int:
-    normalized_sender_id = str(sender_id).strip()
-    if normalized_sender_id in {
-        str(value).strip()
-        for value in bot_author_ids
-        if str(value).strip()
-    }:
-        return PERMISSION_BOT_AUTHOR
-    if is_astrbot_admin or normalized_sender_id in {
-        str(value).strip()
-        for value in configured_manager_ids
-        if str(value).strip()
-    }:
-        return PERMISSION_CONFIGURED_MANAGER
-    normalized_roles = {
-        str(value).strip().lower()
-        for value in platform_roles
-        if str(value).strip()
-    }
-    if normalized_roles & KNOWN_MANAGER_ROLES:
-        return PERMISSION_GROUP_MANAGER
-    return PERMISSION_MEMBER
 
 
 def normalize_subscription(

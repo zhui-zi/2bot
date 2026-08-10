@@ -11,6 +11,7 @@ Public AstrBot plugins used by a personal QQ bot.
 - `astrbot_plugin_group_memory`: bounded, group-isolated conversation memory.
 - `astrbot_plugin_help`: consolidated live command help.
 - `astrbot_plugin_mention_only`: mention-gated and controlled active chat.
+- `astrbot_plugin_permissions`: shared permission hierarchy for administrative features.
 - `astrbot_plugin_tarot`: deterministic daily tarot and multi-card readings.
 - `astrbot_plugin_weather`: compact current weather and short forecasts.
 

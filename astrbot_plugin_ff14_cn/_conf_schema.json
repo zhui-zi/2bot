@@ -34,16 +34,6 @@
     "type": "int",
     "default": 23
   },
-  "bot_author_ids": {
-    "description": "QQ sender IDs granted the highest permission tier.",
-    "type": "list",
-    "default": []
-  },
-  "manager_openids": {
-    "description": "QQ group member OpenIDs allowed to change group settings.",
-    "type": "list",
-    "default": []
-  },
   "max_news_per_poll": {
     "description": "Maximum new entries sent to each subscription per poll.",
     "type": "int",

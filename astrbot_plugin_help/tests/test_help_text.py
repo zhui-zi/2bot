@@ -95,7 +95,11 @@ class HelpTextTests(unittest.TestCase):
         self.assertIn("群聊会区分发言人", text)
         self.assertIn("0–30% 概率主动参与", text)
         self.assertIn("仅限白名单 QQ 会话", text)
-        self.assertIn("作者权限最高", text)
+        self.assertIn(
+            "机器人作者 > AstrBot 管理员 > 当前群群主/管理员 > 普通成员",
+            text,
+        )
+        self.assertIn("/permission 可查看", text)
         self.assertIn("【群记忆】", text)
         self.assertIn("短期对话会遗忘", text)
         self.assertIn("长期只学习稳定偏好和习惯", text)

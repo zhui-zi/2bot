@@ -13,6 +13,10 @@ from astrbot.api.message_components import At, Plain, Reply
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.message_event_result import MessageChain
+from astrbot_plugin_permissions.permission_core import (
+    permission_management_scope,
+    resolve_event_permission,
+)
 
 from .active_chat import (
     is_active_reply_candidate,
@@ -23,10 +27,8 @@ from .active_chat import (
 from .affinity import (
     AffinityState,
     advance_affinity,
-    affinity_management_scope,
     affinity_state_key,
     append_relationship_guidance,
-    extract_platform_roles,
     parse_affinity_state,
     private_state_probe_kind,
     resolve_management_target,
@@ -45,7 +47,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.9.0",
+    "1.11.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -237,7 +239,9 @@ class MentionOnlyChat(Star):
     ):
         management_scope = self._affinity_management_scope(event)
         if management_scope == "none":
-            yield event.plain_result("无权限。")
+            yield event.plain_result(
+                "权限不足：仅机器人作者、AstrBot 管理员或当前群群主/管理员可操作。"
+            )
             return
         normalized_action = str(action or "status").casefold().strip()
         status_actions = {"status", "query", "状态", "查询"}
@@ -360,16 +364,7 @@ class MentionOnlyChat(Star):
         return self._affinity_management_scope(event) != "none"
 
     def _affinity_management_scope(self, event: AstrMessageEvent) -> str:
-        is_admin = False
-        with suppress(Exception):
-            is_admin = bool(event.is_admin())
-        return affinity_management_scope(
-            event.get_sender_id(),
-            is_admin=is_admin,
-            manager_ids=self.config.get("affinity_manager_ids", []),
-            is_group_chat=self._is_group_event(event),
-            platform_roles=extract_platform_roles(self._raw_event_data(event)),
-        )
+        return permission_management_scope(resolve_event_permission(event))
 
     @staticmethod
     def _is_group_event(event: AstrMessageEvent) -> bool:

@@ -1,7 +1,7 @@
 name: astrbot_plugin_group_memory
 display_name: Layered Group Memory
 desc: Keeps isolated short-term and evolving long-term memory for allowlisted QQ groups.
-version: v1.5.0
+version: v1.6.0
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

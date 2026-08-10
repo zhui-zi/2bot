@@ -12,6 +12,10 @@ from astrbot.api.message_components import At, Reply
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.agent.message import TextPart
+from astrbot_plugin_permissions.permission_core import (
+    PERMISSION_GROUP_MANAGER,
+    resolve_event_permission,
+)
 
 from .layered_memory import (
     LongTermMemory,
@@ -50,7 +54,7 @@ STATE_VERSION = 5
     "group_persistent_memory",
     "keita",
     "Keeps isolated persistent chat memory for allowlisted QQ groups.",
-    "1.5.0",
+    "1.6.0",
 )
 class GroupPersistentMemory(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -240,7 +244,10 @@ class GroupPersistentMemory(Star):
             return
         if normalized_action in {"clear", "清空"}:
             if not self._can_manage(event):
-                yield event.plain_result("仅机器人作者、机器人管理员、群主或群管理员可清空群记忆。")
+                yield event.plain_result(
+                    "权限不足：仅机器人作者、AstrBot 管理员或当前群群主/管理员"
+                    "可清空群记忆。"
+                )
                 return
             async with self._lock:
                 key = self._group_key(event)
@@ -566,27 +573,4 @@ class GroupPersistentMemory(Star):
         return max(minimum, min(maximum, value))
 
     def _can_manage(self, event: AstrMessageEvent) -> bool:
-        sender_id = str(event.get_sender_id() or "").strip()
-        manager_ids = {
-            str(value).strip()
-            for value in self.config.get("manager_ids", [])
-            if str(value).strip()
-        }
-        if sender_id in manager_ids or event.is_admin():
-            return True
-        raw_message = getattr(event.message_obj, "raw_message", None)
-        raw = getattr(raw_message, "raw_data", raw_message)
-        values: list[Any] = []
-        if isinstance(raw, dict):
-            for container_name in ("author", "member", "sender"):
-                container = raw.get(container_name)
-                if isinstance(container, dict):
-                    values.extend((container.get("role"), container.get("roles")))
-            values.extend((raw.get("role"), raw.get("roles")))
-        roles: set[str] = set()
-        for value in values:
-            if isinstance(value, list):
-                roles.update(str(item).casefold().strip() for item in value)
-            elif value is not None:
-                roles.add(str(value).casefold().strip())
-        return bool(roles.intersection({"owner", "admin", "administrator", "群主", "管理员"}))
+        return resolve_event_permission(event).level >= PERMISSION_GROUP_MANAGER

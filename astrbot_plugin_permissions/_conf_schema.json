@@ -1,0 +1,12 @@
+{
+  "bot_author_ids": {
+    "description": "Sender IDs with the highest global bot-author permission.",
+    "type": "list",
+    "default": []
+  },
+  "group_manager_overrides": {
+    "description": "Fallback group managers as group_id:sender_id entries when the platform omits roles.",
+    "type": "list",
+    "default": []
+  }
+}

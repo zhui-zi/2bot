@@ -21,3 +21,5 @@ All enabled user-facing feature commands accept explicit natural Chinese request
 The FF14 section documents housing subscriptions with server, size, and purchase-eligibility filters, plus immediate housing queries.
 
 The compact output groups chat, group memory, FF14, and Tataru functions, combines closely related commands, and keeps only essential permission and parameter notes. It explains short casual replies, member-aware group chat, layered forgetting and preference learning, expired disputes, and calm handling of abuse without exposing private relationship state. Internal session, tool, and administrator command sections remain hidden.
+
+Permission guidance uses the shared bot-author, AstrBot-administrator, current-group-manager, and member hierarchy. `/permission` shows the caller's effective level.

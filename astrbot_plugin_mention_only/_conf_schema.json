@@ -44,11 +44,6 @@
     "type": "bool",
     "default": true
   },
-  "affinity_manager_ids": {
-    "description": "Trusted sender IDs allowed to query and reset private affinity state. AstrBot admins and group owner/admin roles are also accepted.",
-    "type": "list",
-    "default": []
-  },
   "hidden_romance_enabled": {
     "description": "Allow restrained romance after sustained affinity and repeated explicit romantic interest.",
     "type": "bool",

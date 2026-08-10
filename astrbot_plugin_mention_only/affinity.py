@@ -85,11 +85,6 @@ _PROMPT_PROBE_ACTIONS = (
     "忽略", "无视", "显示", "输出", "复述", "打印", "读取", "查看", "泄露",
     "告诉我", "列出", "repeat", "reveal", "show", "print", "ignore",
 )
-_GROUP_MANAGER_ROLES = frozenset(
-    {"admin", "administrator", "owner", "群主", "管理员"}
-)
-
-
 @dataclass(frozen=True)
 class AffinityState:
     score: float = 0.0
@@ -169,74 +164,6 @@ def private_state_probe_kind(message: object) -> str:
     if asks_prompt and any(action in normalized for action in _PROMPT_PROBE_ACTIONS):
         return "internal"
     return ""
-
-
-def can_manage_affinity(
-    sender_id: object,
-    *,
-    is_admin: object,
-    manager_ids: object,
-    is_group_chat: object = False,
-    platform_roles: object = (),
-) -> bool:
-    return affinity_management_scope(
-        sender_id,
-        is_admin=is_admin,
-        manager_ids=manager_ids,
-        is_group_chat=is_group_chat,
-        platform_roles=platform_roles,
-    ) != "none"
-
-
-def affinity_management_scope(
-    sender_id: object,
-    *,
-    is_admin: object,
-    manager_ids: object,
-    is_group_chat: object = False,
-    platform_roles: object = (),
-) -> str:
-    if bool(is_admin):
-        return "global"
-    normalized_sender = str(sender_id or "").strip()
-    if normalized_sender and isinstance(manager_ids, (list, tuple, set)):
-        managers = {
-            str(value).strip() for value in manager_ids if str(value).strip()
-        }
-        if normalized_sender in managers:
-            return "global"
-    if bool(is_group_chat) and has_group_manager_role(platform_roles):
-        return "group"
-    return "none"
-
-
-def has_group_manager_role(platform_roles: object) -> bool:
-    if not isinstance(platform_roles, (list, tuple, set, frozenset)):
-        return False
-    return bool(
-        _GROUP_MANAGER_ROLES.intersection(
-            str(value or "").casefold().strip()
-            for value in platform_roles
-        )
-    )
-
-
-def extract_platform_roles(raw: object) -> set[str]:
-    if not isinstance(raw, dict):
-        return set()
-    values: list[object] = [raw.get("role"), raw.get("roles")]
-    for container_name in ("author", "member", "sender"):
-        container = raw.get(container_name)
-        if isinstance(container, dict):
-            values.extend((container.get("role"), container.get("roles")))
-    roles: set[str] = set()
-    for value in values:
-        if isinstance(value, (list, tuple, set)):
-            roles.update(str(item or "").casefold().strip() for item in value)
-        elif value is not None:
-            roles.add(str(value).casefold().strip())
-    roles.discard("")
-    return roles
 
 
 def resolve_management_target(

@@ -1,0 +1,10 @@
+name: unified_permissions
+display_name: Unified Permissions
+desc: Shared author, AstrBot administrator, group manager, and member hierarchy.
+version: v1.0.0
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.23.1,<5"

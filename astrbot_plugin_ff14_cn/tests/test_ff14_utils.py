@@ -11,16 +11,11 @@ sys.path.insert(0, str(PLUGIN_ROOT))
 from ff14_utils import (  # noqa: E402
     BATTLEFIELD_ANCHOR,
     BATTLEFIELD_ROTATION,
-    PERMISSION_BOT_AUTHOR,
-    PERMISSION_CONFIGURED_MANAGER,
-    PERMISSION_GROUP_MANAGER,
-    PERMISSION_MEMBER,
     battlefield_for_time,
     battlefield_rotation_text,
     normalize_scene,
     normalize_subscription,
     parse_feed,
-    resolve_permission_rank,
     resolve_qq_scene,
     strip_markup,
 )
@@ -127,58 +122,6 @@ class PlatformSceneTests(unittest.TestCase):
     def test_non_qq_and_ambiguous_events_are_rejected(self):
         self.assertEqual(resolve_qq_scene("discord", True, False), "")
         self.assertEqual(resolve_qq_scene("aiocqhttp", False, False), "")
-
-
-class PermissionTests(unittest.TestCase):
-    def test_bot_author_has_the_highest_rank(self):
-        author = resolve_permission_rank(
-            "bot-author",
-            is_astrbot_admin=False,
-            bot_author_ids=["bot-author"],
-        )
-        astrbot_admin = resolve_permission_rank(
-            "astrbot-admin",
-            is_astrbot_admin=True,
-        )
-        group_owner = resolve_permission_rank(
-            "group-owner",
-            is_astrbot_admin=False,
-            platform_roles=["owner"],
-        )
-
-        self.assertEqual(author, PERMISSION_BOT_AUTHOR)
-        self.assertEqual(astrbot_admin, PERMISSION_CONFIGURED_MANAGER)
-        self.assertEqual(group_owner, PERMISSION_GROUP_MANAGER)
-        self.assertGreater(author, astrbot_admin)
-        self.assertGreater(astrbot_admin, group_owner)
-
-    def test_configured_manager_and_platform_roles_are_recognized(self):
-        self.assertEqual(
-            resolve_permission_rank(
-                "configured",
-                is_astrbot_admin=False,
-                configured_manager_ids=["configured"],
-            ),
-            PERMISSION_CONFIGURED_MANAGER,
-        )
-        self.assertEqual(
-            resolve_permission_rank(
-                "group-admin",
-                is_astrbot_admin=False,
-                platform_roles=["管理员"],
-            ),
-            PERMISSION_GROUP_MANAGER,
-        )
-
-    def test_regular_member_has_no_manager_rank(self):
-        self.assertEqual(
-            resolve_permission_rank(
-                "member",
-                is_astrbot_admin=False,
-                platform_roles=["member"],
-            ),
-            PERMISSION_MEMBER,
-        )
 
 
 if __name__ == "__main__":

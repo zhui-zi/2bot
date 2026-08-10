@@ -21,4 +21,4 @@ This AstrBot plugin provides bounded, isolated short-term and long-term memory f
 - `/groupmemory status` shows separate short-term and long-term counts.
 - `/groupmemory clear` clears only the current group and requires elevated permission.
 
-Short-term records are retained for 14 days with at most 160 records per group by default. Long-term memories use a 180-day half-life, a 730-day hard limit, recall reinforcement with a 12-hour cooldown, and a 300-memory group cap. These limits and additional trusted manager IDs are configurable in AstrBot WebUI.
+Short-term records are retained for 14 days with at most 160 records per group by default. Long-term memories use a 180-day half-life, a 730-day hard limit, recall reinforcement with a 12-hour cooldown, and a 300-memory group cap. Permission checks use the shared hierarchy; memory limits remain configurable in AstrBot WebUI.

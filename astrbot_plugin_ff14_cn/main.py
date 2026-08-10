@@ -10,16 +10,18 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.command import GreedyStr
+from astrbot_plugin_permissions.permission_core import (
+    PERMISSION_GROUP_MANAGER,
+    resolve_event_permission,
+)
 
 from .ff14_utils import (
     FeedItem,
-    PERMISSION_GROUP_MANAGER,
     SHANGHAI_TZ,
     battlefield_rotation_text,
     normalize_scene,
     normalize_subscription,
     parse_feed,
-    resolve_permission_rank,
     resolve_qq_scene,
 )
 from .housing import (
@@ -41,7 +43,7 @@ STATE_KEY = "state_v1"
     "ff14_cn_push",
     "keita",
     "QQ Official and SnowLuma FF14 CN notifications.",
-    "1.2.0",
+    "1.3.0",
 )
 class FF14CnPush(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -114,8 +116,8 @@ class FF14CnPush(Star):
             return
         if scene == "group" and not self._is_manager(event):
             yield event.plain_result(
-                "仅群主或管理员可修改推送设置。QQ 官方群消息若未提供身份字段，"
-                "请让机器人维护者把你的 /sid 标识加入 AstrBot 管理员或插件 manager_openids。"
+                "权限不足：仅机器人作者、AstrBot 管理员或当前群群主/管理员"
+                "可修改推送设置。"
             )
             return
 
@@ -299,8 +301,8 @@ class FF14CnPush(Star):
             return
         if scene == "group" and not self._is_manager(event):
             yield event.plain_result(
-                "仅群主或管理员可修改推送设置。QQ 官方群消息若未提供身份字段，"
-                "请让机器人维护者把你的 /sid 标识加入 AstrBot 管理员或插件 manager_openids。"
+                "权限不足：仅机器人作者、AstrBot 管理员或当前群群主/管理员"
+                "可修改推送设置。"
             )
             return
 
@@ -580,32 +582,7 @@ class FF14CnPush(Star):
         return parts[2] if len(parts) == 3 else ""
 
     def _is_manager(self, event: AstrMessageEvent) -> bool:
-        return resolve_permission_rank(
-            event.get_sender_id(),
-            is_astrbot_admin=event.is_admin(),
-            bot_author_ids=self.config.get("bot_author_ids", []),
-            configured_manager_ids=self.config.get("manager_openids", []),
-            platform_roles=self._raw_roles(event),
-        ) >= PERMISSION_GROUP_MANAGER
-
-    @staticmethod
-    def _raw_roles(event: AstrMessageEvent) -> set[str]:
-        raw = FF14CnPush._raw_data(event)
-        if not isinstance(raw, dict):
-            return set()
-        values: list[Any] = []
-        for container_name in ("author", "member", "sender"):
-            container = raw.get(container_name)
-            if isinstance(container, dict):
-                values.extend([container.get("role"), container.get("roles")])
-        values.extend([raw.get("role"), raw.get("roles")])
-        roles: set[str] = set()
-        for value in values:
-            if isinstance(value, list):
-                roles.update(str(item).lower().strip() for item in value)
-            elif value is not None:
-                roles.add(str(value).lower().strip())
-        return roles
+        return resolve_event_permission(event).level >= PERMISSION_GROUP_MANAGER
 
     @staticmethod
     def _is_qq_group(event: AstrMessageEvent) -> bool:

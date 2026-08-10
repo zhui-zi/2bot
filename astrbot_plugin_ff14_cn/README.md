@@ -9,8 +9,8 @@ AstrBot plugin for QQ Official and SnowLuma FF14 CN notifications.
 - Polls the public CN housing API and sends one deduplicated update when each five-day lottery application period starts.
 - Filters housing subscriptions by server, S/M/L size, and personal, free-company, or shared eligibility.
 - Stores switches and delivery state independently per group or private chat.
-- Gives configured bot author IDs the highest permission tier, above AstrBot administrators, configured managers, and platform owner/admin roles.
-- Restricts group switch changes to the bot author, AstrBot admins, configured manager OpenIDs, or explicit platform owner/admin roles.
+- Uses the shared permission service for bot authors, AstrBot administrators, and current-group owner/admin roles.
+- Restricts group switch changes to the shared group-manager tier or higher.
 - Allows each private user to manage only their own private subscription.
 - Seeds current RSS entries when enabled to avoid sending historical news.
 
@@ -28,13 +28,13 @@ AstrBot plugin for QQ Official and SnowLuma FF14 CN notifications.
 /ff14push today
 ```
 
-The same commands work in QQ Official and SnowLuma group and private chats. QQ Official group messages may omit the sender's group role. Add trusted group owner and admin `/sid` values to `manager_openids` or the AstrBot administrator list. Group permission checks fail closed when no trusted role or ID is available.
+The same commands work in QQ Official and SnowLuma group and private chats. QQ Official group messages may omit the sender's group role. Add a scoped `group_id:sender_id` entry to the unified permission plugin when this occurs. Group permission checks fail closed when no trusted role or scoped override is available.
 
 Multiple server names and sizes may be supplied in one subscription. A `personal` filter includes personal-only and shared plots. An `fc` filter includes free-company-only and shared plots. Use `shared` to receive shared plots only, or `all` to receive every eligibility type. Enabling or changing a subscription seeds the current cycle and starts automatic delivery with the next application period; `house now` performs an immediate query.
 
 Housing records older than the configured freshness limit are excluded. Automatic delivery also waits until the API reports a complete server refresh after the new application period begins. Records without complete lottery details use the same nine-day cycle model documented by the data source: five application days followed by four result days. Inferred entries are marked in the message. Delivery state is persisted per server and updated only after a successful send, so restarts and temporary API failures do not duplicate completed updates or discard pending ones.
 
-Permission order is configured bot author, AstrBot administrator or configured manager, platform owner or administrator, then regular member. Add the same trusted IDs to AstrBot `admins_id` when built-in administrator commands should use the same authority.
+Permission order is bot author, AstrBot administrator, current-group owner or administrator, then regular member. Bot authors and role fallbacks are configured once in the unified permission plugin.
 
 Private scheduled delivery depends on the QQ Official bot's private-message permissions and messaging limits. The user must first open a private conversation with the bot.
 

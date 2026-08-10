@@ -1,9 +1,4 @@
 {
-  "manager_ids": {
-    "description": "QQ sender IDs allowed to manage persistent group memory.",
-    "type": "list",
-    "default": []
-  },
   "short_term_max_records": {
     "description": "Maximum recent conversational records kept for each allowlisted group.",
     "type": "int",

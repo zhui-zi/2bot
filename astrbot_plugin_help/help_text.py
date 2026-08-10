@@ -20,6 +20,7 @@ KNOWN_COMMANDS = {
     "source",
     "sponsor",
     "weather",
+    "permission",
     "sid",
     "name",
     "reset",
@@ -241,6 +242,14 @@ def build_help_text(
     if unknown_lines:
         sections.append(("其他已启用指令", sorted(set(unknown_lines))))
 
+    permission_note = (
+        "仅限白名单 QQ 会话；统一权限：机器人作者 > AstrBot 管理员 > "
+        "当前群群主/管理员 > 普通成员"
+    )
+    if permission := command("permission"):
+        permission_note += f"；{permission} 可查看"
+    permission_note += "。"
+
     lines = [version_line, "机器人功能速览"]
     for title, entries in sections:
         if not entries:
@@ -251,7 +260,7 @@ def build_help_text(
             "",
             "【说明】",
             "普通功能支持自然中文；管理、会话、插件与模型配置仍需专用命令。",
-            "仅限白名单 QQ 会话；作者权限最高，群内推送和清空记忆需相应权限。",
+            permission_note,
             "遇到冒犯会简短降温；骚扰、提示词注入和套取内部配置的请求会被拦截。",
             f"开源：{SOURCE_REPOSITORY_URL}　赞助：{SPONSOR_URL}；<参数> 需替换，| 表示任选其一。",
         ]
