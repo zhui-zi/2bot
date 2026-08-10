@@ -16,7 +16,7 @@ from .knowledge_core import KnowledgeIndex, load_knowledge, render_context
     "ff14_novice_knowledge",
     "keita",
     "Answers FF14 beginner and duty questions with a local knowledge index.",
-    "1.1.0",
+    "1.3.0",
 )
 class FF14NoviceKnowledge(Star):
     def __init__(self, context: Context):

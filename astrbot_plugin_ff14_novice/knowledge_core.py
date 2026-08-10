@@ -18,6 +18,7 @@ _TITLE_STOP_BIGRAMS = {
 _FF14_MARKERS = (
     "ff14", "ffxiv", "最终幻想14", "最终幻想xiv", "光之战士", "豆芽",
     "副本", "迷宫", "讨伐战", "歼灭战", "零式", "绝本", "职业",
+    "pvp", "战场", "纷争前线", "水晶冲突", "狼狱停船场",
     "装等", "装备", "主线", "任务搜索器", "gcd", "lb", "dps",
     "坦克", "奶妈", "治疗", "仇恨", "极限技", "复活", "坐骑", "陆行鸟",
     "传送", "以太之光", "诗学", "军票", "雇员", "魔晶石", "染色",
@@ -106,6 +107,17 @@ class KnowledgeIndex:
         if not has_marker and not has_title_match:
             return ()
 
+        pvp_document_ids = {
+            item[3].document_id
+            for item in ranked
+            if _query_matches_pvp_topic(normalized_query, item[3].title)
+        }
+        if pvp_document_ids:
+            ranked = [
+                item for item in ranked
+                if item[3].document_id in pvp_document_ids
+            ]
+
         selected: list[KnowledgeChunk] = []
         used_chars = 0
         per_document: Counter[str] = Counter()
@@ -152,6 +164,15 @@ def _query_matches_title(normalized_query: str, title: str) -> bool:
             if bigram not in _TITLE_STOP_BIGRAMS and bigram in normalized_query:
                 return True
     return False
+
+
+def _query_matches_pvp_topic(normalized_query: str, title: str) -> bool:
+    normalized_title = normalize_text(title)
+    return any(
+        marker in normalized_query and marker in normalized_title
+        for marker in ("pvp", "战场", "纷争前线", "水晶冲突", "昂萨哈凯尔")
+    )
+
 
 
 def _boss_section_bonus(normalized_query: str, normalized_heading: str) -> float:
