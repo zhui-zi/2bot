@@ -38,6 +38,10 @@ class NaturalChatStyleTests(unittest.TestCase):
         self.assertIn("ask one useful follow-up", prompt)
         self.assertIn("Treat older insults", prompt)
         self.assertIn("Do not keep score", prompt)
+        self.assertIn("Keep the emotional", prompt)
+        self.assertIn("Disagree with the point, not the person", prompt)
+        self.assertIn("Never insult, belittle, shame", prompt)
+        self.assertIn("do not scold, lecture, punish", prompt)
         self.assertIn("roughly 30 Chinese characters", prompt)
 
     def test_does_not_append_the_style_twice(self) -> None:

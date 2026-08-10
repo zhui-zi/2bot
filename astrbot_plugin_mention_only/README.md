@@ -4,7 +4,7 @@ AstrBot request gate and optional active participation for QQ Official and SnowL
 
 Every group model turn receives a current-member identity prefix from the group-memory plugin. SnowLuma replies also quote the triggering OneBot message, while QQ Official already binds passive replies to the triggering message ID. This keeps concurrent member conversations attached to the correct sender.
 
-The `natural_chat_style` option is enabled by default. It adds a compact system rule that makes casual replies follow the other person's length and energy, avoids unsolicited summaries and advice, and keeps detailed structure for questions that actually need it. The rule is added once per request and does not enter stored conversation history.
+The `natural_chat_style` option is enabled by default. It adds a compact system rule that makes casual replies follow the other person's length and energy, avoids unsolicited summaries and advice, and keeps detailed structure for questions that actually need it. It also keeps conflict temperature low: ambiguous wording receives a benign reading, disagreement targets the point instead of the person, and insults, contempt, retaliatory sarcasm, public shaming, and angry lectures are prohibited. Boundaries stay brief and conversational. The rule is added once per request and does not enter stored conversation history.
 
 Casual replies are also compacted deterministically after generation. Greetings, banter, reactions, feelings, and relationship chat keep only the first natural sentence, capped at 42 characters by default. Factual, technical, strategy, configuration, troubleshooting, and explicitly detailed requests are not compacted.
 
