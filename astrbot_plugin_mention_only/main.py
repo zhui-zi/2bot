@@ -289,7 +289,7 @@ class MentionOnlyChat(Star):
             ).strftime("%Y-%m-%d %H:%M")
         yield event.plain_result(
             f"用户：{target}\n"
-            f"好感：{state.score}/100（{stage_name}）\n"
+            f"好感：{state.score:.1f}/100（{stage_name}）\n"
             f"有效互动：{state.positive_interactions}\n"
             f"恋爱信号日：{state.romance_signals}\n"
             f"拒绝恋爱化：{'是' if state.romance_opt_out else '否'}\n"

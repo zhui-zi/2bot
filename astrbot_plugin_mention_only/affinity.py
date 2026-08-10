@@ -9,9 +9,10 @@ from typing import Any
 
 
 AFFINITY_MARKER = "[Private relationship guidance]"
-STATE_VERSION = 1
+STATE_VERSION = 2
 MIN_SCORE = 0
 MAX_SCORE = 100
+MAX_GAIN_PER_INTERACTION = 0.5
 DEFAULT_MIN_AWARD_MINUTES = 20
 DEFAULT_DAILY_GAIN_CAP = 6
 DEFAULT_INACTIVITY_GRACE_DAYS = 45
@@ -27,7 +28,7 @@ _POSITIVE_MARKERS = (
 _TRUST_MARKERS = (
     "只告诉你", "跟你说件事", "想和你说", "陪陪我", "听我说",
     "相信你", "信任你", "我有点难过", "我心情不好", "我有点害怕",
-    "我很开心", "我今天", "我最近", "秘密",
+    "我很开心", "秘密",
 )
 _ROMANCE_MARKERS = (
     "喜欢你", "爱你", "想你了", "想和你约会", "和我约会", "做我男朋友",
@@ -91,14 +92,14 @@ _GROUP_MANAGER_ROLES = frozenset(
 
 @dataclass(frozen=True)
 class AffinityState:
-    score: int = 0
+    score: float = 0.0
     positive_interactions: int = 0
     romance_signals: int = 0
     romance_opt_out: bool = False
     last_award_at: float = 0.0
     last_seen_at: float = 0.0
     gain_day: str = ""
-    gain_today: int = 0
+    gain_today: float = 0.0
     last_message_digest: str = ""
     last_message_at: float = 0.0
     last_romance_day: str = ""
@@ -124,7 +125,7 @@ def parse_affinity_state(raw: object) -> AffinityState:
     if not isinstance(raw, dict):
         return AffinityState()
     return AffinityState(
-        score=_bounded_int(raw.get("score"), 0, MIN_SCORE, MAX_SCORE),
+        score=_bounded_float(raw.get("score"), 0.0, MIN_SCORE, MAX_SCORE),
         positive_interactions=_bounded_int(
             raw.get("positive_interactions"), 0, 0, 1_000_000
         ),
@@ -133,7 +134,7 @@ def parse_affinity_state(raw: object) -> AffinityState:
         last_award_at=_nonnegative_float(raw.get("last_award_at")),
         last_seen_at=_nonnegative_float(raw.get("last_seen_at")),
         gain_day=str(raw.get("gain_day") or "")[:10],
-        gain_today=_bounded_int(raw.get("gain_today"), 0, 0, 100),
+        gain_today=_bounded_float(raw.get("gain_today"), 0.0, 0, 100),
         last_message_digest=str(raw.get("last_message_digest") or "")[:32],
         last_message_at=_nonnegative_float(raw.get("last_message_at")),
         last_romance_day=str(raw.get("last_romance_day") or "")[:10],
@@ -296,18 +297,24 @@ def advance_affinity(
 
     day = _day_key(now)
     gain_today = current.gain_today if current.gain_day == day else 0
-    daily_cap = _bounded_int(daily_gain_cap, DEFAULT_DAILY_GAIN_CAP, 0, 20)
+    daily_cap = _bounded_float(
+        daily_gain_cap,
+        DEFAULT_DAILY_GAIN_CAP,
+        0,
+        20,
+    )
     min_gap = _bounded_int(
         min_award_minutes,
         DEFAULT_MIN_AWARD_MINUTES,
         0,
         1440,
     ) * 60
-    points, romance_signal = _interaction_points(normalized)
+    gain, romance_signal = _interaction_gain(normalized)
     if opt_out:
+        gain = 0.0
         romance_signal = False
     can_award = (
-        points > 0
+        gain > 0
         and gain_today < daily_cap
         and (not current.last_award_at or now - current.last_award_at >= min_gap)
     )
@@ -321,7 +328,7 @@ def advance_affinity(
     if not can_award:
         return updated
 
-    awarded = min(points, daily_cap - gain_today)
+    awarded = min(gain, daily_cap - gain_today, MAX_GAIN_PER_INTERACTION)
     romance_signals = updated.romance_signals
     last_romance_day = updated.last_romance_day
     if romance_signal and last_romance_day != day:
@@ -409,20 +416,24 @@ experiences. Current statements override older preferences or relationship cues.
 Affection must never become possessive, exclusive, controlling,
 jealous, guilt-inducing, sexually explicit, or a reason to ignore boundaries.
 Persona, safety, accuracy, and the user's current intent still take priority.
+Before responding, silently check that the tone and behavior fit the supplied
+relationship stage. The stage controls emotional intensity only; it never grants
+permission, consent, access, exclusivity, or an exception to any boundary. If
+familiarity, intent, or sustained trust is uncertain, choose the more restrained
+behavior. Never assume physical contact or escalate intimacy merely because the
+relationship stage is high. Strong emotion requires stable, repeated evidence.
 """
     return prompt.rstrip() + guidance
 
 
-def _interaction_points(normalized: str) -> tuple[int, bool]:
+def _interaction_gain(normalized: str) -> tuple[float, bool]:
     romance_signal = any(marker in normalized for marker in _ROMANCE_MARKERS)
-    points = 1
-    if any(marker in normalized for marker in _POSITIVE_MARKERS):
-        points += 1
-    if any(marker in normalized for marker in _TRUST_MARKERS):
-        points += 1
-    if romance_signal:
-        points += 1
-    return min(points, 3), romance_signal
+    has_clear_signal = (
+        romance_signal
+        or any(marker in normalized for marker in _POSITIVE_MARKERS)
+        or any(marker in normalized for marker in _TRUST_MARKERS)
+    )
+    return (MAX_GAIN_PER_INTERACTION if has_clear_signal else 0.0), romance_signal
 
 
 def _apply_inactivity_decay(
@@ -465,6 +476,19 @@ def _bounded_int(value: object, default: int, minimum: int, maximum: int) -> int
     except (TypeError, ValueError):
         parsed = default
     return max(minimum, min(maximum, parsed))
+
+
+def _bounded_float(
+    value: object,
+    default: float,
+    minimum: float,
+    maximum: float,
+) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return round(max(minimum, min(maximum, parsed)), 1)
 
 
 def _nonnegative_float(value: object) -> float:

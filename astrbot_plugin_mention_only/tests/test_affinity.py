@@ -44,6 +44,13 @@ class AffinityStateTests(unittest.TestCase):
         self.assertEqual(state.romance_signals, 4)
         self.assertEqual(state.last_seen_at, 0)
 
+    def test_parsing_preserves_half_points_and_migrates_integer_scores(self) -> None:
+        state = parse_affinity_state({"score": 12.5, "gain_today": 1.5})
+        self.assertEqual(state.score, 12.5)
+        self.assertEqual(state.gain_today, 1.5)
+        self.assertEqual(parse_affinity_state({"score": 12}).score, 12.0)
+        self.assertEqual(state.to_dict()["version"], 2)
+
     def test_state_key_does_not_expose_sender_identity(self) -> None:
         key = affinity_state_key("aiocqhttp", "123456789")
         self.assertTrue(key.startswith("affinity_v1_"))
@@ -169,14 +176,27 @@ class AffinityStateTests(unittest.TestCase):
 
 
 class AffinityProgressionTests(unittest.TestCase):
-    def test_normal_interaction_builds_affinity_gradually(self) -> None:
+    def test_only_clear_signals_build_affinity_gradually(self) -> None:
         state = advance_affinity(AffinityState(), "今天去钓鱼吗", now=DAY)
-        self.assertEqual(state.score, 1)
-        self.assertEqual(state.positive_interactions, 1)
-        warm = advance_affinity(state, "谢谢你，和你聊天真好", now=DAY + 1199)
-        self.assertEqual(warm.score, 1)
-        warm = advance_affinity(warm, "辛苦了，有你真好", now=DAY + 1201)
-        self.assertEqual(warm.score, 3)
+        self.assertEqual(state.score, 0.0)
+        self.assertEqual(state.positive_interactions, 0)
+        state = advance_affinity(state, "我今天去钓鱼", now=DAY + 0.5)
+        self.assertEqual(state.score, 0.0)
+        warm = advance_affinity(state, "谢谢你，和你聊天真好", now=DAY + 1)
+        self.assertEqual(warm.score, 0.5)
+        self.assertEqual(warm.positive_interactions, 1)
+        early = advance_affinity(warm, "辛苦了，真的很靠谱", now=DAY + 1199)
+        self.assertEqual(early.score, 0.5)
+        warm = advance_affinity(early, "辛苦了，有你真好", now=DAY + 1202)
+        self.assertEqual(warm.score, 1.0)
+
+    def test_single_interaction_never_gains_more_than_half_point(self) -> None:
+        state = advance_affinity(
+            AffinityState(),
+            "谢谢你，我很信任你，也喜欢你",
+            now=DAY,
+        )
+        self.assertEqual(state.score, 0.5)
 
     def test_duplicate_and_daily_caps_prevent_farming(self) -> None:
         state = AffinityState()
@@ -186,7 +206,7 @@ class AffinityProgressionTests(unittest.TestCase):
                 "谢谢你，喜欢和你聊",
                 now=DAY + index * 1201,
             )
-        self.assertEqual(state.score, 2)
+        self.assertEqual(state.score, 0.5)
 
         state = AffinityState()
         for index in range(20):
@@ -195,7 +215,7 @@ class AffinityProgressionTests(unittest.TestCase):
                 f"谢谢你，第 {index} 次正常聊天",
                 now=2 * DAY + index * 1201,
             )
-        self.assertEqual(state.score, 6)
+        self.assertEqual(state.score, 6.0)
 
     def test_harassment_neither_rewards_nor_reduces_affinity(self) -> None:
         original = AffinityState(
@@ -268,6 +288,7 @@ class AffinityProgressionTests(unittest.TestCase):
 
         rejection = advance_affinity(state, "我不喜欢你", now=2 * DAY)
         self.assertTrue(rejection.romance_opt_out)
+        self.assertEqual(rejection.score, 80)
         self.assertEqual(rejection.romance_signals, 3)
 
 
@@ -282,6 +303,12 @@ class RelationshipPromptTests(unittest.TestCase):
         self.assertIn("never invent shared", prompt)
         self.assertIn("Current statements override older preferences", prompt)
         self.assertIn("must never become possessive", prompt)
+        normalized = " ".join(prompt.split())
+        self.assertIn("controls emotional intensity only", normalized)
+        self.assertIn("never grants permission", normalized)
+        self.assertIn("choose the more restrained behavior", normalized)
+        self.assertIn("Never assume physical contact", normalized)
+        self.assertIn("Strong emotion requires stable, repeated evidence", normalized)
 
     def test_guidance_is_not_appended_twice(self) -> None:
         prompt = append_relationship_guidance("Stay in character.", "trusted")

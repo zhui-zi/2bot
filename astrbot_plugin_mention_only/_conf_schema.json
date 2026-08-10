@@ -60,7 +60,7 @@
     "default": 20
   },
   "affinity_daily_gain_cap": {
-    "description": "Maximum affinity gained by one user per UTC day, from 0 to 20.",
+    "description": "Maximum affinity gained by one user per UTC day, from 0 to 20. Each clear interaction can add at most 0.5.",
     "type": "int",
     "default": 6
   },
