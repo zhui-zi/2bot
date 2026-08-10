@@ -1,8 +1,13 @@
 {
   "classifier_enabled": {
-    "description": "Use the Flash model for ambiguous intent and security classification.",
+    "description": "Use the Flash model for ambiguous feature intent and security classification.",
     "type": "bool",
     "default": true
+  },
+  "classify_ordinary_chat": {
+    "description": "Send ordinary chat through the Flash classifier before the visible chat model.",
+    "type": "bool",
+    "default": false
   },
   "flash_provider_id": {
     "description": "AstrBot provider ID used by the front classifier.",

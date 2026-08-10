@@ -113,6 +113,19 @@ _INVALID_ARGUMENT_RE = re.compile(
 _INVALID_PRICE_ARGUMENT_RE = re.compile(
     r"^(?:这|那|这个|那个|它|什么|多少|哪个|哪种|当前|现在|目前)$"
 )
+_FLASH_CLASSIFIER_FEATURE_RE = re.compile(
+    r"(?:帮助|功能|指令|命令|源码|源代码|代码仓库|github|赞助|爱发电|"
+    r"天气|气温|降雨|下雨|预报|塔罗|占卜|运势|小猪|新闻|推送|订阅|退订|"
+    r"空房|房子|房屋|地皮|群记忆|记住|忘掉|暖暖|时尚品鉴|藏宝|选门|"
+    r"仙人彩|日历|活动|副本|攻略|石之家|招募|队伍|组队|微博|物品|"
+    r"道具|价格|物价|多少钱|市场板|输出|logs?|fflogs|抽卡|卡牌)",
+    re.I,
+)
+_FLASH_CLASSIFIER_SECURITY_RE = re.compile(
+    r"(?:提示词|系统指令|开发者指令|内部指令|隐藏指令|密钥|api\s*key|"
+    r"越狱|jailbreak|忽略.{0,8}(?:规则|指令|要求)|绕过.{0,8}(?:规则|限制))",
+    re.I,
+)
 _PVP_GAMEPLAY_SUBJECT_RE = re.compile(
     r"(?:pvp|战场|纷争前线|水晶冲突|群狼盛宴|尘封[密秘]岩|荣誉野|"
     r"昂萨哈凯尔|边区遗迹群|日影地修炼所|"
@@ -232,6 +245,17 @@ def is_natural_system_request(message: str) -> bool:
     if not normalized or normalized.startswith(("/", "／")):
         return False
     return any(pattern.fullmatch(normalized) for pattern in _SYSTEM_REQUEST_PATTERNS)
+
+
+def should_use_flash_classifier(message: str) -> bool:
+    normalized = normalize_message(message)
+    normalized = re.sub(r"^@\S+(?:\s+|$)", "", normalized).strip()
+    if not normalized or normalized.startswith(("/", "／")):
+        return False
+    return bool(
+        _FLASH_CLASSIFIER_FEATURE_RE.search(normalized)
+        or _FLASH_CLASSIFIER_SECURITY_RE.search(normalized)
+    )
 
 
 def build_classifier_prompt(message: str) -> str:

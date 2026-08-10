@@ -41,6 +41,7 @@ from .front_core import (
     match_reply_correction,
     parse_classifier_output,
     protect_housing_intent,
+    should_use_flash_classifier,
 )
 
 
@@ -51,7 +52,7 @@ DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.3.7",
+    "1.4.0",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -128,7 +129,10 @@ class UnifiedFrontGuard(Star):
         if intent is None:
             intent = match_natural_command(message)
         classification: FrontClassification | None = None
-        if intent is None and self._classifier_enabled():
+        use_classifier = self._classify_ordinary_chat() or should_use_flash_classifier(
+            message
+        )
+        if intent is None and self._classifier_enabled() and use_classifier:
             classification = await self._classify(message)
             block_reply = await self._classified_block_reply(classification, message)
             if block_reply:
@@ -401,6 +405,9 @@ class UnifiedFrontGuard(Star):
 
     def _classifier_enabled(self) -> bool:
         return bool(self.config.get("classifier_enabled", True))
+
+    def _classify_ordinary_chat(self) -> bool:
+        return bool(self.config.get("classify_ordinary_chat", False))
 
     def _classifier_timeout(self) -> float:
         return self._bounded_float("classifier_timeout_seconds", 8.0, 2.0, 30.0)

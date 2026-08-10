@@ -1,6 +1,6 @@
 # Unified Front Guard
 
-This AstrBot plugin is the single front layer for user-facing natural commands, harassment handling, and prompt-injection defense. High-confidence local rules run first, while ambiguous requests use the `deepseek_v4_flash` provider. Repeated classifications are cached by message hash.
+This AstrBot plugin is the single front layer for user-facing natural commands, harassment handling, and prompt-injection defense. High-confidence local rules run first. Only messages containing feature or security signals use the `deepseek_v4_flash` classifier by default; ordinary chat proceeds directly to the visible chat model. Repeated classifications are cached by message hash.
 
 Harassment and prompt-injection blocks use the same Flash provider to generate a short, varied boundary-setting reply with thinking disabled and no tools. Harassment replies stay calm, avoid retaliatory sarcasm or scolding, and invite a topic change. The original message is passed only as untrusted data. A fixed safe fallback is used only when Flash is unavailable or returns an invalid response.
 

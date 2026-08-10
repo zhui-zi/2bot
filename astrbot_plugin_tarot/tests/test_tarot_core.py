@@ -18,6 +18,7 @@ from tarot_core import (  # noqa: E402
     draw_daily_fortune,
     draw_three_cards,
     format_daily_fortune,
+    format_reading_response,
     format_spread,
 )
 
@@ -67,6 +68,19 @@ class TarotDeckTests(unittest.TestCase):
         for card in cards:
             self.assertIn(card.card.name, prompt)
             self.assertIn(card.card.name, header)
+
+    def test_formats_complete_reading_and_empty_fallback(self):
+        rendered = format_reading_response("【牌阵】", "【解读】向前走。")
+        self.assertIn("【牌阵】", rendered)
+        self.assertIn("【解读】向前走。", rendered)
+        self.assertIn("仅供娱乐与自我反思", rendered)
+        fallback = format_reading_response("【牌阵】", "")
+        self.assertIn("没有形成清晰的信息", fallback)
+
+    def test_main_routes_tarot_to_flash_without_default_request(self):
+        source = (PLUGIN_ROOT / "main.py").read_text(encoding="utf-8")
+        self.assertIn("chat_provider_id=self._provider_id()", source)
+        self.assertNotIn("event.request_llm", source)
 
 
 class CooldownTests(unittest.TestCase):

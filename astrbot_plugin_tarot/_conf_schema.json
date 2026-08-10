@@ -1,4 +1,19 @@
 {
+  "flash_provider_id": {
+    "description": "AstrBot provider ID used for tarot readings.",
+    "type": "string",
+    "default": "deepseek_v4_flash"
+  },
+  "reading_timeout_seconds": {
+    "description": "Maximum time allowed for a Flash tarot reading.",
+    "type": "float",
+    "default": 20
+  },
+  "reading_max_tokens": {
+    "description": "Maximum output tokens for a Flash tarot reading.",
+    "type": "int",
+    "default": 480
+  },
   "cooldown_seconds": {
     "description": "Per-user reading cooldown in seconds.",
     "type": "int",
