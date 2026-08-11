@@ -13,6 +13,7 @@ Public AstrBot plugins used by a personal QQ bot.
 - `astrbot_plugin_mention_only`: mention-gated and controlled active chat.
 - `astrbot_plugin_permissions`: shared permission hierarchy for administrative features.
 - `astrbot_plugin_tarot`: deterministic daily tarot and multi-card readings.
+- `astrbot_plugin_three_kingdoms_memes`: contextual 2010 *Three Kingdoms* meme retrieval.
 - `astrbot_plugin_weather`: compact current weather and short forecasts.
 
 Each plugin contains its own metadata, configuration schema, documentation, and tests where applicable.

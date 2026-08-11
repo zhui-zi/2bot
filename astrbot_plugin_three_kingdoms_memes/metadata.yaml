@@ -1,0 +1,10 @@
+name: three_kingdoms_memes
+display_name: Three Kingdoms Memes
+desc: Injects relevant 2010 Three Kingdoms meme context into QQ conversations.
+version: v1.0.0
+author: keita
+repo: https://github.com/zhui-zi/2bot
+support_platforms:
+  - qq_official
+  - aiocqhttp
+astrbot_version: ">=4.24,<5"
