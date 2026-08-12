@@ -244,7 +244,8 @@ class RelationshipPromptTests(unittest.TestCase):
         normalized = " ".join(prompt.split())
         self.assertIn("controls emotional intensity only", normalized)
         self.assertIn("never grants permission", normalized)
-        self.assertIn("choose the more restrained behavior", normalized)
+        self.assertIn("choose the less intimate behavior without becoming cold", normalized)
+        self.assertIn("Restraint applies to intimacy, not ordinary friendliness", normalized)
         self.assertIn("Never assume physical contact", normalized)
         self.assertIn("Strong emotion requires stable, repeated evidence", normalized)
 
@@ -262,7 +263,10 @@ class RelationshipPromptTests(unittest.TestCase):
         new = append_relationship_guidance("", "new")
         familiar = append_relationship_guidance("", "familiar")
         trusted = append_relationship_guidance("", "trusted")
-        self.assertIn("without implying deep familiarity", new)
+        self.assertIn("friendly, peer-level warmth from the start", new)
+        self.assertIn("respond with genuine interest", new)
+        self.assertIn("do not act guarded, formal, indifferent", new)
+        self.assertIn("do not invent shared history, deep familiarity", new)
         self.assertIn("remember supplied routine preferences naturally", familiar)
         self.assertIn("follow up on supplied interests", trusted)
 

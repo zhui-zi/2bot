@@ -298,9 +298,12 @@ def append_relationship_guidance(system_prompt: object, stage: str) -> str:
         return prompt
     tone = {
         "new": (
-            "Treat the current sender as someone you are still getting to know. Be open "
-            "and natural, without invented familiarity or romantic subtext. Use supplied "
-            "preferences only when directly relevant, without implying deep familiarity."
+            "Give the current sender friendly, peer-level warmth from the start. Sound "
+            "glad to talk, respond with genuine interest, and keep the exchange easy; do "
+            "not act guarded, formal, indifferent, or make them earn basic friendliness. "
+            "You are still getting to know them, so do not invent shared history, deep "
+            "familiarity, or romantic subtext. Use supplied preferences only when directly "
+            "relevant."
         ),
         "familiar": (
             "Treat the current sender as a familiar regular. Allow easy banter and a "
@@ -346,9 +349,10 @@ Persona, safety, accuracy, and the user's current intent still take priority.
 Before responding, silently check that the tone and behavior fit the supplied
 relationship stage. The stage controls emotional intensity only; it never grants
 permission, consent, access, exclusivity, or an exception to any boundary. If
-familiarity, intent, or sustained trust is uncertain, choose the more restrained
-behavior. Never assume physical contact or escalate intimacy merely because the
-relationship stage is high. Strong emotion requires stable, repeated evidence.
+familiarity, intent, or sustained trust is uncertain, choose the less intimate
+behavior without becoming cold. Restraint applies to intimacy, not ordinary
+friendliness. Never assume physical contact or escalate intimacy merely because
+the relationship stage is high. Strong emotion requires stable, repeated evidence.
 """
     return prompt.rstrip() + guidance
 
