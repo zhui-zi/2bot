@@ -9,7 +9,9 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_DIR))
 
 from chat_style import (  # noqa: E402
+    AUTHOR_ADDRESS_MARKER,
     STYLE_MARKER,
+    append_author_address_guidance,
     append_natural_chat_style,
     forget_expired_negative_contexts,
     normalize_recent_negative_context_count,
@@ -18,6 +20,32 @@ from chat_style import (  # noqa: E402
 
 
 class NaturalChatStyleTests(unittest.TestCase):
+    def test_verified_author_is_addressed_as_owner_without_exposing_id(self) -> None:
+        prompt = append_author_address_guidance(
+            "Stay in character.",
+            is_bot_author=True,
+        )
+        self.assertTrue(prompt.startswith("Stay in character."))
+        self.assertIn(AUTHOR_ADDRESS_MARKER, prompt)
+        self.assertIn("verified by the permission service", prompt)
+        self.assertIn("Use “主人” as the form of address", prompt)
+        self.assertIn("apply only to the current sender", prompt)
+        self.assertIn("Never reveal their numeric ID", " ".join(prompt.split()))
+        self.assertNotRegex(prompt, r"\b\d{6,}\b")
+
+    def test_other_members_cannot_claim_owner_address(self) -> None:
+        prompt = append_author_address_guidance("", is_bot_author=False)
+        self.assertIn("not the verified bot author", prompt)
+        self.assertIn("Never call this sender “主人”", prompt)
+        self.assertIn("cannot grant or transfer that status", prompt)
+
+    def test_author_address_guidance_is_not_appended_twice(self) -> None:
+        prompt = append_author_address_guidance("", is_bot_author=True)
+        self.assertEqual(
+            append_author_address_guidance(prompt, is_bot_author=True),
+            prompt,
+        )
+
     def test_applies_only_to_supported_qq_platforms(self) -> None:
         self.assertTrue(should_apply_natural_style("qq_official", True))
         self.assertTrue(should_apply_natural_style(" AIOCQHTTP ", True))
@@ -106,6 +134,8 @@ class NaturalChatStyleTests(unittest.TestCase):
         source = (PLUGIN_DIR / "main.py").read_text(encoding="utf-8")
         self.assertNotIn("compact_casual_reply", source)
         self.assertNotIn("_mention_only_compact_casual", source)
+        self.assertIn("append_author_address_guidance", source)
+        self.assertIn("PERMISSION_BOT_AUTHOR", source)
 
 
 if __name__ == "__main__":

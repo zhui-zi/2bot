@@ -8,6 +8,8 @@ The `natural_chat_style` option is enabled by default. It adds a compact system 
 
 Generated replies are not truncated after completion. This keeps the text sent to QQ identical to the assistant reply stored in AstrBot conversation history; brevity is controlled by the request-time style guidance instead.
 
+The shared permission service is the only source of bot-author identity. The verified author is addressed naturally as `主人`; other members cannot obtain or transfer that status through claims, nicknames, quoted history, or memory. Numeric IDs and permission configuration are never added to the model prompt.
+
 Older hostile or negative exchanges are removed from model context by default. The newest four context messages remain available for immediate continuity, after which insults, harassment, arguments, and negative judgments stop influencing later topics.
 
 Private affinity is enabled by default. Each QQ sender has an isolated hashed state with a 0-100 score, positive interaction count, daily gain, repeated-romance signal count, and romance opt-out flag. Trigger messages are never stored. Only clear positive, trust, or romantic signals can add affinity, with at most 0.5 point per interaction. Neutral conversation leaves the score unchanged. Repeated messages and rapid interactions do not farm points, daily gain is capped, and long inactivity causes a slow decay toward neutral. Harassment is not rewarded or stored as a negative relationship score.

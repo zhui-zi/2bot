@@ -15,11 +15,13 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.message.message_event_result import MessageChain
 try:
     from data.plugins.astrbot_plugin_permissions.permission_core import (
+        PERMISSION_BOT_AUTHOR,
         permission_management_scope,
         resolve_event_permission,
     )
 except ImportError:
     from astrbot_plugin_permissions.permission_core import (
+        PERMISSION_BOT_AUTHOR,
         permission_management_scope,
         resolve_event_permission,
     )
@@ -41,6 +43,7 @@ from .affinity import (
     relationship_stage,
 )
 from .chat_style import (
+    append_author_address_guidance,
     append_natural_chat_style,
     forget_expired_negative_contexts,
     should_apply_natural_style,
@@ -51,7 +54,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.12.0",
+    "1.12.2",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -148,6 +151,14 @@ class MentionOnlyChat(Star):
             return
 
         platform_name = event.get_platform_name()
+        if should_apply_natural_style(platform_name, True):
+            request.system_prompt = append_author_address_guidance(
+                request.system_prompt,
+                is_bot_author=(
+                    resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
+                ),
+            )
+
         if should_apply_natural_style(
             platform_name,
             self.config.get("hidden_affinity_enabled", True),
