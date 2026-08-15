@@ -1,7 +1,7 @@
 name: ff14_cn_push
 display_name: FF14 CN Push
 desc: QQ Official and SnowLuma FF14 CN news, Frontline, and housing notifications.
-version: v1.3.0
+version: v1.3.1
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

@@ -103,13 +103,18 @@ def battlefield_for_time(now: datetime) -> tuple[str, str]:
 
 def battlefield_rotation_text(now: datetime) -> str:
     local_now = now.astimezone(SHANGHAI_TZ)
-    tomorrow = local_now + timedelta(days=1)
-    _, today_full_name = battlefield_for_time(local_now)
-    _, tomorrow_full_name = battlefield_for_time(tomorrow)
+    rotation_day = (local_now - BATTLEFIELD_ANCHOR).days
+    current_start = BATTLEFIELD_ANCHOR + timedelta(days=rotation_day)
+    next_start = current_start + timedelta(days=1)
+    next_end = next_start + timedelta(days=1)
+    _, current_full_name = battlefield_for_time(current_start)
+    _, next_full_name = battlefield_for_time(next_start)
     return (
         "【每日战场轮换】\n"
-        f"今日（{local_now:%Y-%m-%d}）：{today_full_name}\n"
-        f"明日（{tomorrow:%Y-%m-%d}）：{tomorrow_full_name}"
+        f"本轮（{current_start:%Y-%m-%d %H:%M} 至 {next_start:%Y-%m-%d %H:%M}）："
+        f"{current_full_name}\n"
+        f"下轮（{next_start:%Y-%m-%d %H:%M} 至 {next_end:%Y-%m-%d %H:%M}）："
+        f"{next_full_name}"
     )
 
 
