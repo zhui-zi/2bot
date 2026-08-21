@@ -6,6 +6,8 @@ TRUSTED_LLM_ALLOW_REASONS = frozenset(
     {"tarot_reading", "active_reply", "ff14_novice"}
 )
 MAX_ACTIVE_REPLY_PERCENT = 30.0
+DEFAULT_ACTIVE_REPLY_COOLDOWN_MINUTES = 30.0
+MAX_ACTIVE_REPLY_COOLDOWN_MINUTES = 1440.0
 
 
 def normalize_reply_percent(value: object) -> float:
@@ -38,6 +40,28 @@ def is_active_reply_candidate(
 
 def should_reply(percent: object, random_sample: float) -> bool:
     return random_sample < normalize_reply_percent(percent) / 100.0
+
+
+def normalize_reply_cooldown_minutes(value: object) -> float:
+    try:
+        minutes = float(value)
+    except (TypeError, ValueError):
+        return DEFAULT_ACTIVE_REPLY_COOLDOWN_MINUTES
+    return max(0.0, min(MAX_ACTIVE_REPLY_COOLDOWN_MINUTES, minutes))
+
+
+def active_reply_cooldown_elapsed(
+    last_reply_at: object,
+    now: object,
+    cooldown_minutes: object,
+) -> bool:
+    try:
+        last = float(last_reply_at)
+        current = float(now)
+    except (TypeError, ValueError):
+        return True
+    cooldown_seconds = normalize_reply_cooldown_minutes(cooldown_minutes) * 60.0
+    return current < last or current - last >= cooldown_seconds
 
 
 def should_quote_group_reply(

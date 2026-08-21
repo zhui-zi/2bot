@@ -53,7 +53,7 @@ DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.4.2",
+    "1.4.3",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -418,9 +418,11 @@ class UnifiedFrontGuard(Star):
         return bool(self.config.get("classify_ordinary_chat", False))
 
     def _harassment_bypassed(self, event: AstrMessageEvent) -> bool:
-        return is_harassment_bypassed_group(
-            event.get_group_id(),
-            self.config.get("harassment_bypass_group_ids", []),
+        return event.get_extra("_nsfw_mode_active") == "adult_content" or (
+            is_harassment_bypassed_group(
+                event.get_group_id(),
+                self.config.get("harassment_bypass_group_ids", []),
+            )
         )
 
     def _classifier_timeout(self) -> float:

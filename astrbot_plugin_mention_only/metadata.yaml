@@ -1,7 +1,7 @@
 name: mention_only_chat
 display_name: Mention Only Chat
 desc: Gates direct chat and keeps QQ replies conversational and relational.
-version: v1.12.4
+version: v1.13.0
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

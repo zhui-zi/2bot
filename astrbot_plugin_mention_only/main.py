@@ -27,6 +27,7 @@ except ImportError:
     )
 
 from .active_chat import (
+    active_reply_cooldown_elapsed,
     is_active_reply_candidate,
     should_allow_llm_request,
     should_quote_group_reply,
@@ -54,7 +55,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.12.4",
+    "1.13.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -62,6 +63,8 @@ class MentionOnlyChat(Star):
         self.config = config
         self._affinity_lock = asyncio.Lock()
         self._affinity_cache: dict[str, AffinityState] = {}
+        self._active_reply_lock = asyncio.Lock()
+        self._active_reply_last_at: dict[str, float] = {}
 
     @filter.event_message_type(filter.EventMessageType.ALL, priority=900)
     async def protect_private_relationship_state(self, event: AstrMessageEvent):
@@ -100,7 +103,7 @@ class MentionOnlyChat(Star):
         ):
             return
 
-        percent = self.config.get("active_reply_percent", 5)
+        percent = self.config.get("active_reply_percent", 2)
         if not should_reply(percent, random.random()):
             return
 
@@ -126,12 +129,26 @@ class MentionOnlyChat(Star):
             logger.warning("Active group reply skipped because no conversation is available.")
             return
 
+        cooldown_minutes = self.config.get("active_reply_cooldown_minutes", 30)
+        cooldown_key = str(event.unified_msg_origin or "").strip()
+        now = time.monotonic()
+        async with self._active_reply_lock:
+            last_reply_at = self._active_reply_last_at.get(cooldown_key)
+            if not active_reply_cooldown_elapsed(
+                last_reply_at,
+                now,
+                cooldown_minutes,
+            ):
+                return
+            self._active_reply_last_at[cooldown_key] = now
+
         event.set_extra("_mention_only_llm_allow", "active_reply")
         logger.info(
-            "Active group reply triggered for platform=%s group=%s probability=%s%%.",
+            "Active group reply triggered for platform=%s group=%s probability=%s%% cooldown=%sm.",
             event.get_platform_name(),
             event.get_group_id(),
             percent,
+            cooldown_minutes,
         )
         yield event.request_llm(prompt=message, conversation=conversation)
 

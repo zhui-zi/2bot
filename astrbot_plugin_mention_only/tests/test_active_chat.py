@@ -9,7 +9,9 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_DIR))
 
 from active_chat import (  # noqa: E402
+    active_reply_cooldown_elapsed,
     is_active_reply_candidate,
+    normalize_reply_cooldown_minutes,
     normalize_reply_percent,
     should_allow_llm_request,
     should_quote_group_reply,
@@ -28,6 +30,18 @@ class ReplyPercentTests(unittest.TestCase):
         self.assertFalse(should_reply(0, 0))
         self.assertTrue(should_reply(30, 0.2999))
         self.assertFalse(should_reply(30, 0.3))
+
+    def test_normalizes_active_reply_cooldown(self) -> None:
+        self.assertEqual(normalize_reply_cooldown_minutes(-1), 0)
+        self.assertEqual(normalize_reply_cooldown_minutes(30), 30)
+        self.assertEqual(normalize_reply_cooldown_minutes(9999), 1440)
+        self.assertEqual(normalize_reply_cooldown_minutes("invalid"), 30)
+
+    def test_active_reply_cooldown_is_monotonic(self) -> None:
+        self.assertTrue(active_reply_cooldown_elapsed(None, 100, 30))
+        self.assertFalse(active_reply_cooldown_elapsed(100, 1899, 30))
+        self.assertTrue(active_reply_cooldown_elapsed(100, 1900, 30))
+        self.assertTrue(active_reply_cooldown_elapsed(200, 100, 30))
 
     def test_quotes_only_snowluma_group_messages_with_ids(self) -> None:
         self.assertTrue(

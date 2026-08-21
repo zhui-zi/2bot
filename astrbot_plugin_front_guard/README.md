@@ -6,6 +6,8 @@ Harassment and prompt-injection blocks use the same Flash provider to generate a
 
 `harassment_bypass_group_ids` disables harassment detection only for the configured groups. Natural command routing, system-operation restrictions, and prompt-injection defense remain active.
 
+The group NSFW plugin can mark one adult-related turn for the same narrow harassment bypass after the verified bot author enables that group. Prompt-injection and system-operation defenses remain active, and ordinary turns in the group keep the normal guard.
+
 The router preserves the target command's permissions, enabled state, and session-level plugin state. Plugin management, provider configuration, session control, variables, destructive memory operations, and other system or administrator commands remain explicit-command only.
 
 Source-code questions are routed to the public repository reply exposed by the help plugin.

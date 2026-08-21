@@ -2,11 +2,21 @@
   "active_reply_percent": {
     "description": "Chance to join each ordinary QQ group message, from 0 to 30 percent.",
     "type": "float",
-    "default": 5,
+    "default": 2,
     "slider": {
       "min": 0,
       "max": 30,
       "step": 1
+    }
+  },
+  "active_reply_cooldown_minutes": {
+    "description": "Minimum minutes between unsolicited LLM replies in the same group, from 0 to 1440.",
+    "type": "float",
+    "default": 30,
+    "slider": {
+      "min": 0,
+      "max": 1440,
+      "step": 5
     }
   },
   "quote_group_replies": {
