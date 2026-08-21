@@ -9,6 +9,11 @@
     "type": "bool",
     "default": false
   },
+  "harassment_bypass_group_ids": {
+    "description": "Group IDs that bypass harassment detection while retaining command routing and prompt-injection defense.",
+    "type": "list",
+    "default": []
+  },
   "flash_provider_id": {
     "description": "AstrBot provider ID used by the front classifier.",
     "type": "string",

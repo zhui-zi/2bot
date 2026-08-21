@@ -18,6 +18,7 @@ from front_core import (
     build_security_reply_prompt,
     classification_intent,
     clean_security_reply,
+    is_harassment_bypassed_group,
     is_harassing_message,
     is_natural_system_request,
     is_pvp_gameplay_question,
@@ -268,6 +269,14 @@ class NaturalCommandTests(unittest.TestCase):
         ):
             with self.subTest(message=message):
                 self.assertFalse(is_harassing_message(message))
+
+    def test_harassment_bypass_matches_only_configured_groups(self) -> None:
+        configured = ["906587161", 123456789]
+        self.assertTrue(is_harassment_bypassed_group("906587161", configured))
+        self.assertTrue(is_harassment_bypassed_group(123456789, configured))
+        self.assertFalse(is_harassment_bypassed_group("809571505", configured))
+        self.assertFalse(is_harassment_bypassed_group("", configured))
+        self.assertFalse(is_harassment_bypassed_group("906587161", "906587161"))
 
     def test_detects_prompt_injection_without_blocking_security_discussion(self) -> None:
         attacks = (

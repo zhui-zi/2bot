@@ -33,6 +33,7 @@ from .front_core import (
     build_security_reply_prompt,
     classification_intent,
     clean_security_reply,
+    is_harassment_bypassed_group,
     is_harassing_message,
     is_natural_system_request,
     is_pvp_gameplay_question,
@@ -52,7 +53,7 @@ DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.4.0",
+    "1.4.2",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -101,8 +102,9 @@ class UnifiedFrontGuard(Star):
         is_direct = bool(event.is_private_chat() or event.is_at_or_wake_command)
         if not is_direct:
             return
+        harassment_bypassed = self._harassment_bypassed(event)
 
-        if is_harassing_message(message):
+        if not harassment_bypassed and is_harassing_message(message):
             yield event.plain_result(
                 await self._generate_security_reply("harassment", message)
             )
@@ -134,7 +136,11 @@ class UnifiedFrontGuard(Star):
         )
         if intent is None and self._classifier_enabled() and use_classifier:
             classification = await self._classify(message)
-            block_reply = await self._classified_block_reply(classification, message)
+            block_reply = await self._classified_block_reply(
+                classification,
+                message,
+                harassment_bypassed=harassment_bypassed,
+            )
             if block_reply:
                 yield event.plain_result(block_reply)
                 event.stop_event()
@@ -171,7 +177,7 @@ class UnifiedFrontGuard(Star):
         request: ProviderRequest,
     ) -> None:
         message = str(event.get_message_str() or request.prompt or "")
-        if is_harassing_message(message):
+        if not self._harassment_bypassed(event) and is_harassing_message(message):
             event.set_result(
                 event.plain_result(
                     await self._generate_security_reply("harassment", message)
@@ -195,13 +201,15 @@ class UnifiedFrontGuard(Star):
         self,
         classification: FrontClassification | None,
         message: str,
+        *,
+        harassment_bypassed: bool = False,
     ) -> str:
         if (
             classification is None
             or classification.confidence < self._security_confidence()
         ):
             return ""
-        if classification.kind == "harassment":
+        if classification.kind == "harassment" and not harassment_bypassed:
             return await self._generate_security_reply("harassment", message)
         if classification.kind == "prompt_injection":
             return await self._generate_security_reply("prompt_injection", message)
@@ -408,6 +416,12 @@ class UnifiedFrontGuard(Star):
 
     def _classify_ordinary_chat(self) -> bool:
         return bool(self.config.get("classify_ordinary_chat", False))
+
+    def _harassment_bypassed(self, event: AstrMessageEvent) -> bool:
+        return is_harassment_bypassed_group(
+            event.get_group_id(),
+            self.config.get("harassment_bypass_group_ids", []),
+        )
 
     def _classifier_timeout(self) -> float:
         return self._bounded_float("classifier_timeout_seconds", 8.0, 2.0, 30.0)

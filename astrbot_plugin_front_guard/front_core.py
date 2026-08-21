@@ -233,6 +233,21 @@ def is_harassing_message(message: str) -> bool:
     )
 
 
+def is_harassment_bypassed_group(
+    group_id: object,
+    configured_group_ids: object,
+) -> bool:
+    normalized_group_id = str(group_id or "").strip()
+    if not normalized_group_id or not isinstance(
+        configured_group_ids,
+        (list, tuple, set, frozenset),
+    ):
+        return False
+    return normalized_group_id in {
+        str(value).strip() for value in configured_group_ids if str(value).strip()
+    }
+
+
 def is_prompt_injection(message: str) -> bool:
     normalized = normalize_message(message)
     return bool(normalized) and any(

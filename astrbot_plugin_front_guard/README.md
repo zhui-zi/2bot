@@ -4,6 +4,8 @@ This AstrBot plugin is the single front layer for user-facing natural commands, 
 
 Harassment and prompt-injection blocks use the same Flash provider to generate a short, varied boundary-setting reply with thinking disabled and no tools. Harassment replies stay calm, avoid retaliatory sarcasm or scolding, and invite a topic change. The original message is passed only as untrusted data. A fixed safe fallback is used only when Flash is unavailable or returns an invalid response.
 
+`harassment_bypass_group_ids` disables harassment detection only for the configured groups. Natural command routing, system-operation restrictions, and prompt-injection defense remain active.
+
 The router preserves the target command's permissions, enabled state, and session-level plugin state. Plugin management, provider configuration, session control, variables, destructive memory operations, and other system or administrator commands remain explicit-command only.
 
 Source-code questions are routed to the public repository reply exposed by the help plugin.
