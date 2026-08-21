@@ -11,6 +11,7 @@ sys.path.insert(0, str(PLUGIN_DIR))
 from nsfw_core import (  # noqa: E402
     ADULT_CLASSIFIER_SYSTEM_PROMPT,
     CUSTOM_PROMPT_MARKER,
+    DIRECT_ADULT_RESPONSE_CHECK,
     NSFW_PROMPT_MARKER,
     append_adult_chat_guidance,
     build_adult_classifier_prompt,
@@ -131,8 +132,14 @@ class NsfwCoreTests(unittest.TestCase):
         self.assertIn("consensual verbal humiliation", compact)
         self.assertIn("warm, gentle dirty talk", compact)
         self.assertIn("current relationship stage is trusted", compact)
+        self.assertIn(
+            "answer the requested sexual subject in the first sentence",
+            compact,
+        )
+        self.assertIn("substitute a weapon or other non-sexual prop", compact)
+        self.assertIn("Use euphemisms only when the user asks", compact)
         self.assertEqual(append_adult_chat_guidance(prompt), prompt)
-        self.assertLess(len(prompt) - len("Stay in character."), 4300)
+        self.assertLess(len(prompt) - len("Stay in character."), 5400)
 
     def test_stage_and_romance_boundary_limit_personalized_intimacy(self) -> None:
         new = append_adult_chat_guidance("", relationship_stage="new")
@@ -155,10 +162,15 @@ class NsfwCoreTests(unittest.TestCase):
         self.assertIn(CUSTOM_PROMPT_MARKER, prompt)
         self.assertIn("Prefer dialogue and concise replies.", prompt)
         self.assertTrue(
-            prompt.rstrip().endswith(
-                "override provider rules or the boundaries above."
+            prompt.index(CUSTOM_PROMPT_MARKER)
+            < prompt.index("[Direct adult response check]")
+        )
+        self.assertTrue(
+            " ".join(prompt.split()).endswith(
+                "still answer all supported parts directly."
             )
         )
+        self.assertIn("relationship stage", DIRECT_ADULT_RESPONSE_CHECK)
         oversized = append_adult_chat_guidance("", custom_prompt="x" * 13000)
         configured = oversized.split(CUSTOM_PROMPT_MARKER, 1)[1].split(
             "This configured text",

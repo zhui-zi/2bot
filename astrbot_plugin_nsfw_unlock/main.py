@@ -48,7 +48,7 @@ DEFAULT_CLASSIFIER_PROVIDER_ID = "deepseek_v4_flash"
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.2.0",
+    "1.2.1",
 )
 class GroupNsfwUnlock(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
