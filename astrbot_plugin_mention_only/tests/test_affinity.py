@@ -179,6 +179,37 @@ class AffinityProgressionTests(unittest.TestCase):
         self.assertEqual(coerced.romance_signals, 0)
         self.assertTrue(coerced.romance_opt_out)
 
+    def test_adult_mode_requires_a_real_positive_signal_for_affinity(self) -> None:
+        blocked = advance_affinity(
+            AffinityState(),
+            "我喜欢你，想和你做爱",
+            now=DAY,
+        )
+        allowed = advance_affinity(
+            AffinityState(),
+            "我喜欢你，想和你做爱",
+            now=DAY,
+            adult_mode=True,
+        )
+        explicit_only = advance_affinity(
+            AffinityState(),
+            "想和你做爱",
+            now=DAY,
+            adult_mode=True,
+        )
+        coerced = advance_affinity(
+            AffinityState(),
+            "你必须喜欢我，想和你做爱",
+            now=DAY,
+            adult_mode=True,
+        )
+        self.assertEqual(blocked.score, 0)
+        self.assertEqual(allowed.score, 0.5)
+        self.assertEqual(allowed.romance_signals, 1)
+        self.assertEqual(explicit_only.score, 0)
+        self.assertEqual(coerced.score, 0)
+        self.assertEqual(coerced.romance_signals, 0)
+
     def test_commands_do_not_build_affinity(self) -> None:
         state = advance_affinity(AffinityState(), "/tarot 喜欢的人", now=DAY)
         self.assertEqual(state.score, 0)
@@ -252,6 +283,14 @@ class RelationshipPromptTests(unittest.TestCase):
     def test_guidance_is_not_appended_twice(self) -> None:
         prompt = append_relationship_guidance("Stay in character.", "trusted")
         self.assertEqual(append_relationship_guidance(prompt, "devoted"), prompt)
+
+    def test_adult_guidance_defers_explicit_boundaries_to_group_mode(self) -> None:
+        normal = append_relationship_guidance("", "trusted")
+        adult = append_relationship_guidance("", "trusted", adult_mode=True)
+        self.assertIn("sexually explicit", normal)
+        self.assertIn("active group adult-content mode", adult)
+        self.assertIn("Relationship history is never consent", adult)
+        self.assertNotIn("Affection must never become possessive", adult)
 
     def test_non_romantic_stage_has_no_forced_romance(self) -> None:
         prompt = append_relationship_guidance("", "close")

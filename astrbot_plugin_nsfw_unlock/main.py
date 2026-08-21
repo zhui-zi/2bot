@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from astrbot.api import logger
+from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star, register
@@ -24,6 +24,8 @@ except ImportError:
 from .nsfw_core import (
     NSFW_EVENT_EXTRA,
     NSFW_EVENT_VALUE,
+    RELATIONSHIP_STAGE_EXTRA,
+    ROMANCE_OPT_OUT_EXTRA,
     append_adult_chat_guidance,
     is_nsfw_related,
     is_nsfw_turn,
@@ -37,11 +39,12 @@ from .nsfw_core import (
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.0.0",
+    "1.1.0",
 )
 class GroupNsfwUnlock(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config
         self._state_lock = asyncio.Lock()
         self._state_cache: dict[str, bool] = {}
 
@@ -54,7 +57,7 @@ class GroupNsfwUnlock(Star):
             event.set_extra(NSFW_EVENT_EXTRA, NSFW_EVENT_VALUE)
 
     @filter.on_llm_request(priority=850)
-    async def inject_adult_prompt(
+    async def prepare_adult_turn(
         self,
         event: AstrMessageEvent,
         request: ProviderRequest,
@@ -71,7 +74,21 @@ class GroupNsfwUnlock(Star):
         ):
             return
         event.set_extra(NSFW_EVENT_EXTRA, NSFW_EVENT_VALUE)
-        request.system_prompt = append_adult_chat_guidance(request.system_prompt)
+
+    @filter.on_llm_request(priority=-900)
+    async def inject_adult_prompt(
+        self,
+        event: AstrMessageEvent,
+        request: ProviderRequest,
+    ) -> None:
+        if event.get_extra(NSFW_EVENT_EXTRA) != NSFW_EVENT_VALUE:
+            return
+        request.system_prompt = append_adult_chat_guidance(
+            request.system_prompt,
+            relationship_stage=event.get_extra(RELATIONSHIP_STAGE_EXTRA),
+            romance_opt_out=bool(event.get_extra(ROMANCE_OPT_OUT_EXTRA)),
+            custom_prompt=self.config.get("custom_nsfw_prompt", ""),
+        )
 
     @filter.command("nsfw", alias={"成人模式"}, priority=950)
     async def manage_nsfw(

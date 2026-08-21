@@ -1,0 +1,7 @@
+{
+  "custom_nsfw_prompt": {
+    "description": "Optional author-managed adult style prompt. Applied only to adult turns in enabled groups and limited to supported content and style.",
+    "type": "string",
+    "default": ""
+  }
+}

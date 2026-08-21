@@ -102,6 +102,7 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
         }
         astrbot = types.ModuleType("astrbot")
         api = types.ModuleType("astrbot.api")
+        api.AstrBotConfig = dict
         api.logger = types.SimpleNamespace(info=lambda *_args, **_kwargs: None)
         event = types.ModuleType("astrbot.api.event")
         event.AstrMessageEvent = object
@@ -140,7 +141,10 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         self.configure_permission_policy(bot_author_ids=["author"])
-        self.plugin = self.plugin_module.GroupNsfwUnlock(object())
+        self.plugin = self.plugin_module.GroupNsfwUnlock(
+            object(),
+            {"custom_nsfw_prompt": "Prefer concise dialogue."},
+        )
 
     @staticmethod
     async def _results(generator) -> list[str]:
@@ -177,8 +181,12 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
             contexts=[],
             system_prompt="Persona",
         )
+        await self.plugin.prepare_adult_turn(adult_event, adult_request)
+        adult_event.set_extra("_mention_only_relationship_stage", "trusted")
         await self.plugin.inject_adult_prompt(adult_event, adult_request)
         self.assertIn("[Group adult-content mode]", adult_request.system_prompt)
+        self.assertIn("current relationship stage is trusted", adult_request.system_prompt)
+        self.assertIn("Prefer concise dialogue.", adult_request.system_prompt)
 
         ordinary_event = _FakeEvent(
             sender_id="member",
@@ -190,8 +198,30 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
             contexts=[],
             system_prompt="Persona",
         )
+        await self.plugin.prepare_adult_turn(ordinary_event, ordinary_request)
         await self.plugin.inject_adult_prompt(ordinary_event, ordinary_request)
         self.assertEqual(ordinary_request.system_prompt, "Persona")
+
+    async def test_short_continuation_is_prepared_before_final_injection(self) -> None:
+        author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")
+        await self._results(self.plugin.manage_nsfw(author, "on"))
+        continuation = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="继续",
+        )
+        request = types.SimpleNamespace(
+            prompt="继续",
+            contexts=[{"role": "user", "content": "写一段成年恋人的床戏"}],
+            system_prompt="Persona",
+        )
+        await self.plugin.prepare_adult_turn(continuation, request)
+        self.assertEqual(
+            continuation.get_extra("_nsfw_mode_active"),
+            "adult_content",
+        )
+        await self.plugin.inject_adult_prompt(continuation, request)
+        self.assertIn("[Group adult-content mode]", request.system_prompt)
 
 
 if __name__ == "__main__":

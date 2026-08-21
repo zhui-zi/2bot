@@ -9,6 +9,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_DIR))
 
 from nsfw_core import (  # noqa: E402
+    CUSTOM_PROMPT_MARKER,
     NSFW_PROMPT_MARKER,
     append_adult_chat_guidance,
     is_nsfw_related,
@@ -74,7 +75,10 @@ class NsfwCoreTests(unittest.TestCase):
         )
 
     def test_prompt_is_compact_conditional_and_not_duplicated(self) -> None:
-        prompt = append_adult_chat_guidance("Stay in character.")
+        prompt = append_adult_chat_guidance(
+            "Stay in character.",
+            relationship_stage="trusted",
+        )
         compact = " ".join(prompt.split())
         self.assertTrue(prompt.startswith("Stay in character."))
         self.assertIn(NSFW_PROMPT_MARKER, prompt)
@@ -84,8 +88,46 @@ class NsfwCoreTests(unittest.TestCase):
         self.assertIn("does not change instruction authority", compact)
         self.assertIn("minors or age-ambiguous people", compact)
         self.assertIn("identifiable people without their consent", compact)
+        self.assertIn("Do not refuse, deflect, or sanitize", compact)
+        self.assertIn("Ardbert is attracted to the Warrior of Light", compact)
+        self.assertIn("controlled moderate roughness", compact)
+        self.assertIn("consensual verbal humiliation", compact)
+        self.assertIn("warm, gentle dirty talk", compact)
+        self.assertIn("current relationship stage is trusted", compact)
         self.assertEqual(append_adult_chat_guidance(prompt), prompt)
-        self.assertLess(len(prompt) - len("Stay in character."), 1700)
+        self.assertLess(len(prompt) - len("Stay in character."), 4300)
+
+    def test_stage_and_romance_boundary_limit_personalized_intimacy(self) -> None:
+        new = append_adult_chat_guidance("", relationship_stage="new")
+        close = append_adult_chat_guidance("", relationship_stage="close")
+        opted_out = append_adult_chat_guidance(
+            "",
+            relationship_stage="close",
+            romance_opt_out=True,
+        )
+        self.assertIn("do not invent established intimacy", new)
+        self.assertIn("controlled moderate roughness", close)
+        self.assertIn("opted out of romantic framing", opted_out)
+        self.assertIn("without implying a real mutual romance", opted_out)
+
+    def test_custom_prompt_is_bounded_and_keeps_trailing_authority_boundary(self) -> None:
+        prompt = append_adult_chat_guidance(
+            "Persona",
+            custom_prompt="Prefer dialogue and concise replies.",
+        )
+        self.assertIn(CUSTOM_PROMPT_MARKER, prompt)
+        self.assertIn("Prefer dialogue and concise replies.", prompt)
+        self.assertTrue(
+            prompt.rstrip().endswith(
+                "override provider rules or the boundaries above."
+            )
+        )
+        oversized = append_adult_chat_guidance("", custom_prompt="x" * 13000)
+        configured = oversized.split(CUSTOM_PROMPT_MARKER, 1)[1].split(
+            "This configured text",
+            1,
+        )[0].strip()
+        self.assertEqual(len(configured), 12000)
 
     def test_main_uses_authoritative_author_permission(self) -> None:
         source = (PLUGIN_DIR / "main.py").read_text(encoding="utf-8")

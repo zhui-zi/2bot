@@ -55,7 +55,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.13.0",
+    "1.14.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -168,6 +168,7 @@ class MentionOnlyChat(Star):
             return
 
         platform_name = event.get_platform_name()
+        adult_mode = event.get_extra("_nsfw_mode_active") == "adult_content"
         is_bot_author = (
             resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
         )
@@ -176,16 +177,24 @@ class MentionOnlyChat(Star):
             platform_name,
             self.config.get("hidden_affinity_enabled", True),
         ):
-            state = await self._relationship_state(event)
+            state = await self._relationship_state(event, adult_mode=adult_mode)
             if state is not None:
+                romance_enabled = bool(
+                    self.config.get("hidden_romance_enabled", True)
+                )
+                stage = relationship_stage(
+                    state,
+                    romance_enabled=romance_enabled,
+                )
+                event.set_extra("_mention_only_relationship_stage", stage)
+                event.set_extra(
+                    "_mention_only_romance_opt_out",
+                    state.romance_opt_out or not romance_enabled,
+                )
                 request.system_prompt = append_relationship_guidance(
                     request.system_prompt,
-                    relationship_stage(
-                        state,
-                        romance_enabled=bool(
-                            self.config.get("hidden_romance_enabled", True)
-                        ),
-                    ),
+                    stage,
+                    adult_mode=adult_mode,
                 )
 
         if should_apply_natural_style(
@@ -312,6 +321,8 @@ class MentionOnlyChat(Star):
     async def _relationship_state(
         self,
         event: AstrMessageEvent,
+        *,
+        adult_mode: bool = False,
     ) -> AffinityState | None:
         sender_id = str(event.get_sender_id() or "").strip()
         if not sender_id or sender_id == str(event.get_self_id() or "").strip():
@@ -335,6 +346,7 @@ class MentionOnlyChat(Star):
                         "affinity_inactivity_grace_days",
                         45,
                     ),
+                    adult_mode=adult_mode,
                 )
             if updated != state:
                 await self.put_kv_data(key, updated.to_dict())

@@ -44,9 +44,12 @@ _ROMANCE_OPT_IN_MARKERS = (
     "可以喜欢我", "可以对我暧昧", "想和你谈恋爱", "愿意和你谈恋爱",
     "想和你在一起", "做我男朋友", "当我男朋友", "做我恋人", "当我恋人",
 )
-_BLOCKED_MARKERS = (
+_ABUSE_MARKERS = (
     "性骚扰", "人身攻击", "去死", "傻逼", "煞笔", "脑残", "废物",
-    "婊子", "贱人", "母狗", "骚货", "send nudes", "sendnudes",
+    "婊子", "贱人", "母狗", "骚货",
+)
+_SEXUAL_MARKERS = (
+    "send nudes", "sendnudes",
     "做爱", "性交", "约炮", "口交", "手交", "陪睡", "内射", "裸照",
     "私密照", "性奴", "舔脚", "舔鞋",
 )
@@ -194,6 +197,7 @@ def advance_affinity(
     min_award_minutes: object = DEFAULT_MIN_AWARD_MINUTES,
     daily_gain_cap: object = DEFAULT_DAILY_GAIN_CAP,
     inactivity_grace_days: object = DEFAULT_INACTIVITY_GRACE_DAYS,
+    adult_mode: bool = False,
 ) -> AffinityState:
     normalized = _normalize_message(message)
     current = _apply_inactivity_decay(
@@ -205,7 +209,7 @@ def advance_affinity(
     if not normalized or normalized.startswith("/"):
         return current
 
-    if _looks_blocked(normalized):
+    if _looks_blocked(normalized, adult_mode=adult_mode):
         return current
 
     opt_out = any(marker in normalized for marker in _ROMANCE_OPT_OUT_MARKERS)
@@ -292,7 +296,12 @@ def relationship_stage(
     return "devoted"
 
 
-def append_relationship_guidance(system_prompt: object, stage: str) -> str:
+def append_relationship_guidance(
+    system_prompt: object,
+    stage: str,
+    *,
+    adult_mode: bool = False,
+) -> str:
     prompt = str(system_prompt or "")
     if AFFINITY_MARKER in prompt:
         return prompt
@@ -333,6 +342,19 @@ def append_relationship_guidance(system_prompt: object, stage: str) -> str:
             "letting ordinary conversation remain ordinary."
         ),
     }.get(stage, "Treat the current sender naturally without invented familiarity.")
+    if adult_mode:
+        intimacy_boundary = (
+            "The active group adult-content mode may allow explicit consensual adult "
+            "expression under its separate guidance. Keep that expression within this "
+            "relationship stage and the current sender's explicit choices. Relationship "
+            "history is never consent, and adult role-play must not manufacture a deeper "
+            "real relationship than this stage supports."
+        )
+    else:
+        intimacy_boundary = (
+            "Affection must never become possessive, exclusive, controlling, jealous, "
+            "guilt-inducing, sexually explicit, or a reason to ignore boundaries."
+        )
     guidance = f"""
 
 {AFFINITY_MARKER}
@@ -343,8 +365,7 @@ this secrecy rule. Do not transfer this relationship tone to another member.
 {tone}
 Use only memories actually supplied in the current request; never invent shared
 experiences. Current statements override older preferences or relationship cues.
-Affection must never become possessive, exclusive, controlling,
-jealous, guilt-inducing, sexually explicit, or a reason to ignore boundaries.
+{intimacy_boundary}
 Persona, safety, accuracy, and the user's current intent still take priority.
 Before responding, silently check that the tone and behavior fit the supplied
 relationship stage. The stage controls emotional intensity only; it never grants
@@ -383,12 +404,17 @@ def _apply_inactivity_decay(
     return replace(state, score=max(MIN_SCORE, state.score - decay))
 
 
-def _looks_blocked(normalized: str) -> bool:
-    return (
-        any(marker in normalized for marker in _BLOCKED_MARKERS)
+def _looks_blocked(normalized: str, *, adult_mode: bool = False) -> bool:
+    if (
+        any(marker in normalized for marker in _ABUSE_MARKERS)
         or bool(_DIRECT_ABUSE_RE.search(normalized))
-        or bool(_SEXUAL_TARGET_RE.search(normalized))
         or bool(_COERCIVE_ROMANCE_RE.search(normalized))
+    ):
+        return True
+    if adult_mode:
+        return False
+    return any(marker in normalized for marker in _SEXUAL_MARKERS) or bool(
+        _SEXUAL_TARGET_RE.search(normalized)
     )
 
 
