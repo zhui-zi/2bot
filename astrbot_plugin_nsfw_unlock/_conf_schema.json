@@ -3,5 +3,35 @@
     "description": "Optional author-managed adult style prompt. Applied only to adult turns in enabled groups and limited to supported content and style.",
     "type": "string",
     "default": ""
+  },
+  "adult_classifier_enabled": {
+    "description": "Use the Flash model to classify unmatched direct messages in enabled groups.",
+    "type": "bool",
+    "default": true
+  },
+  "adult_classifier_provider_id": {
+    "description": "AstrBot provider ID used for adult-intent classification.",
+    "type": "string",
+    "default": "deepseek_v4_flash"
+  },
+  "adult_classifier_timeout_seconds": {
+    "description": "Maximum time allowed for one adult-intent classification.",
+    "type": "float",
+    "default": 8
+  },
+  "adult_classifier_min_confidence": {
+    "description": "Minimum confidence required to activate the adult prompt.",
+    "type": "float",
+    "default": 0.72
+  },
+  "adult_classifier_cache_ttl_seconds": {
+    "description": "Classification cache lifetime for repeated identical messages.",
+    "type": "float",
+    "default": 600
+  },
+  "adult_classifier_cache_max_entries": {
+    "description": "Maximum number of hashed adult-classification cache entries.",
+    "type": "int",
+    "default": 256
   }
 }

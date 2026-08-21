@@ -30,6 +30,7 @@ class _FilterApi:
 
 class _FakeStar:
     def __init__(self, _context) -> None:
+        self.context = _context
         self._kv: dict[str, object] = {}
 
     async def get_kv_data(self, key: str, default: object) -> object:
@@ -39,6 +40,16 @@ class _FakeStar:
         self._kv[key] = value
 
 
+class _FakeAt:
+    def __init__(self, qq: str) -> None:
+        self.qq = qq
+
+
+class _FakeReply:
+    def __init__(self, sender_id: str) -> None:
+        self.sender_id = sender_id
+
+
 class _FakeEvent:
     def __init__(
         self,
@@ -46,10 +57,13 @@ class _FakeEvent:
         sender_id: str,
         group_id: str,
         message: str,
+        direct: bool = True,
     ) -> None:
         self._sender_id = sender_id
         self._group_id = group_id
         self._message = message
+        self.is_at_or_wake_command = direct
+        self._messages: list[object] = []
         self._extra: dict[str, object] = {}
         raw = types.SimpleNamespace(
             raw_data={"group_id": group_id, "message_type": "group"}
@@ -70,6 +84,12 @@ class _FakeEvent:
     def get_message_str(self) -> str:
         return self._message
 
+    def get_self_id(self) -> str:
+        return "bot"
+
+    def get_messages(self) -> list[object]:
+        return self._messages
+
     def is_admin(self) -> bool:
         return False
 
@@ -87,6 +107,18 @@ class _FakeEvent:
         return text
 
 
+class _FakeContext:
+    def __init__(self) -> None:
+        self.responses: list[str] = []
+        self.calls: list[dict[str, object]] = []
+
+    async def llm_generate(self, **kwargs):
+        self.calls.append(kwargs)
+        if not self.responses:
+            raise RuntimeError("missing fake response")
+        return types.SimpleNamespace(completion_text=self.responses.pop(0))
+
+
 class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -96,6 +128,7 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
                 "astrbot",
                 "astrbot.api",
                 "astrbot.api.event",
+                "astrbot.api.message_components",
                 "astrbot.api.provider",
                 "astrbot.api.star",
             )
@@ -103,10 +136,16 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
         astrbot = types.ModuleType("astrbot")
         api = types.ModuleType("astrbot.api")
         api.AstrBotConfig = dict
-        api.logger = types.SimpleNamespace(info=lambda *_args, **_kwargs: None)
+        api.logger = types.SimpleNamespace(
+            info=lambda *_args, **_kwargs: None,
+            warning=lambda *_args, **_kwargs: None,
+        )
         event = types.ModuleType("astrbot.api.event")
         event.AstrMessageEvent = object
         event.filter = _FilterApi
+        message_components = types.ModuleType("astrbot.api.message_components")
+        message_components.At = _FakeAt
+        message_components.Reply = _FakeReply
         provider = types.ModuleType("astrbot.api.provider")
         provider.ProviderRequest = object
         star = types.ModuleType("astrbot.api.star")
@@ -118,6 +157,7 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
                 "astrbot": astrbot,
                 "astrbot.api": api,
                 "astrbot.api.event": event,
+                "astrbot.api.message_components": message_components,
                 "astrbot.api.provider": provider,
                 "astrbot.api.star": star,
             }
@@ -141,9 +181,14 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         self.configure_permission_policy(bot_author_ids=["author"])
+        self.context = _FakeContext()
         self.plugin = self.plugin_module.GroupNsfwUnlock(
-            object(),
-            {"custom_nsfw_prompt": "Prefer concise dialogue."},
+            self.context,
+            {
+                "custom_nsfw_prompt": "Prefer concise dialogue.",
+                "adult_classifier_enabled": True,
+                "adult_classifier_provider_id": "deepseek_v4_flash",
+            },
         )
 
     @staticmethod
@@ -222,6 +267,75 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
         )
         await self.plugin.inject_adult_prompt(continuation, request)
         self.assertIn("[Group adult-content mode]", request.system_prompt)
+
+    async def test_flash_classifies_unmatched_direct_messages_and_caches_result(self) -> None:
+        author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")
+        await self._results(self.plugin.manage_nsfw(author, "on"))
+        self.context.responses.append('{"adult": true, "confidence": 0.93}')
+
+        first = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="这个隐晦说法你懂的",
+        )
+        await self.plugin.mark_adult_turn(first)
+        self.assertEqual(first.get_extra("_nsfw_mode_active"), "adult_content")
+        self.assertEqual(len(self.context.calls), 1)
+        self.assertEqual(
+            self.context.calls[0]["chat_provider_id"],
+            "deepseek_v4_flash",
+        )
+        self.assertEqual(
+            self.context.calls[0]["response_format"],
+            {"type": "json_object"},
+        )
+
+        repeated = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="这个隐晦说法你懂的",
+        )
+        await self.plugin.mark_adult_turn(repeated)
+        self.assertEqual(repeated.get_extra("_nsfw_mode_active"), "adult_content")
+        self.assertEqual(len(self.context.calls), 1)
+
+    async def test_flash_rejects_ordinary_and_skips_undirected_group_traffic(self) -> None:
+        author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")
+        await self._results(self.plugin.manage_nsfw(author, "on"))
+        self.context.responses.append('{"adult": false, "confidence": 0.99}')
+        ordinary = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="今晚打哪个副本？",
+        )
+        await self.plugin.mark_adult_turn(ordinary)
+        self.assertIsNone(ordinary.get_extra("_nsfw_mode_active"))
+        self.assertEqual(len(self.context.calls), 1)
+
+        undirected = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="另一个没人问机器人的隐晦说法",
+            direct=False,
+        )
+        await self.plugin.mark_adult_turn(undirected)
+        self.assertIsNone(undirected.get_extra("_nsfw_mode_active"))
+        self.assertEqual(len(self.context.calls), 1)
+
+    async def test_reply_to_bot_is_eligible_for_flash_classification(self) -> None:
+        author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")
+        await self._results(self.plugin.manage_nsfw(author, "on"))
+        self.context.responses.append('{"adult": true, "confidence": 0.91}')
+        reply = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="接着用那个隐晦说法",
+            direct=False,
+        )
+        reply._messages.append(_FakeReply("bot"))
+        await self.plugin.mark_adult_turn(reply)
+        self.assertEqual(reply.get_extra("_nsfw_mode_active"), "adult_content")
+        self.assertEqual(len(self.context.calls), 1)
 
 
 if __name__ == "__main__":

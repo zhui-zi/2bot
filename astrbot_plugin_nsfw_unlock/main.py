@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
+from collections import OrderedDict
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.message_components import At, Reply
 from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star, register
 
@@ -22,24 +25,30 @@ except ImportError:
     )
 
 from .nsfw_core import (
+    ADULT_CLASSIFIER_SYSTEM_PROMPT,
     NSFW_EVENT_EXTRA,
     NSFW_EVENT_VALUE,
     RELATIONSHIP_STAGE_EXTRA,
     ROMANCE_OPT_OUT_EXTRA,
     append_adult_chat_guidance,
+    build_adult_classifier_prompt,
     is_nsfw_related,
     is_nsfw_turn,
     normalize_nsfw_action,
     nsfw_state_key,
+    parse_adult_classifier_output,
     parse_nsfw_enabled,
 )
+
+
+DEFAULT_CLASSIFIER_PROVIDER_ID = "deepseek_v4_flash"
 
 
 @register(
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.1.2",
+    "1.2.0",
 )
 class GroupNsfwUnlock(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -47,13 +56,26 @@ class GroupNsfwUnlock(Star):
         self.config = config
         self._state_lock = asyncio.Lock()
         self._state_cache: dict[str, bool] = {}
+        self._classifier_lock = asyncio.Lock()
+        self._classification_cache: OrderedDict[
+            str, tuple[float, bool]
+        ] = OrderedDict()
 
     @filter.event_message_type(filter.EventMessageType.ALL, priority=950)
     async def mark_adult_turn(self, event: AstrMessageEvent) -> None:
         group_id = event_group_id(event)
-        if not group_id or not is_nsfw_related(event.get_message_str() or ""):
+        if not group_id or not await self._is_enabled(
+            event.get_platform_name(),
+            group_id,
+        ):
             return
-        if await self._is_enabled(event.get_platform_name(), group_id):
+        message = str(event.get_message_str() or "").strip()
+        if is_nsfw_related(message):
+            event.set_extra(NSFW_EVENT_EXTRA, NSFW_EVENT_VALUE)
+            return
+        if not self._should_classify(event, message):
+            return
+        if await self._classify_adult(message):
             event.set_extra(NSFW_EVENT_EXTRA, NSFW_EVENT_VALUE)
 
     @filter.on_llm_request(priority=850)
@@ -146,6 +168,136 @@ class GroupNsfwUnlock(Star):
             enabled = parse_nsfw_enabled(await self.get_kv_data(key, {}))
             self._state_cache[key] = enabled
             return enabled
+
+    def _should_classify(self, event: AstrMessageEvent, message: str) -> bool:
+        return bool(
+            self.config.get("adult_classifier_enabled", True)
+            and message
+            and not message.startswith(("/", "／"))
+            and (
+                getattr(event, "is_at_or_wake_command", False)
+                or self._targets_bot(event)
+            )
+        )
+
+    @staticmethod
+    def _targets_bot(event: AstrMessageEvent) -> bool:
+        self_id = str(event.get_self_id() or "")
+        return any(
+            (
+                isinstance(component, At)
+                and str(component.qq or "") == self_id
+            )
+            or (
+                isinstance(component, Reply)
+                and str(component.sender_id or "") == self_id
+            )
+            for component in event.get_messages()
+        )
+
+    async def _classify_adult(self, message: str) -> bool:
+        cache_key = hashlib.sha256(message.encode("utf-8")).hexdigest()
+        now = time.monotonic()
+        async with self._classifier_lock:
+            cached = self._classification_cache.get(cache_key)
+            if cached and now - cached[0] <= self._classifier_cache_ttl():
+                self._classification_cache.move_to_end(cache_key)
+                return cached[1]
+        try:
+            response = await asyncio.wait_for(
+                self.context.llm_generate(
+                    chat_provider_id=self._classifier_provider_id(),
+                    prompt=build_adult_classifier_prompt(message),
+                    system_prompt=ADULT_CLASSIFIER_SYSTEM_PROMPT,
+                    contexts=[],
+                    temperature=0,
+                    max_tokens=64,
+                    thinking={"type": "disabled"},
+                    response_format={"type": "json_object"},
+                ),
+                timeout=self._classifier_timeout(),
+            )
+            classification = parse_adult_classifier_output(
+                response.completion_text or ""
+            )
+        except Exception as exc:
+            logger.warning(
+                "Group NSFW classification failed error=%s.",
+                type(exc).__name__,
+            )
+            return False
+        if classification is None:
+            logger.warning("Group NSFW classifier returned invalid output.")
+            return False
+        matched = bool(
+            classification.adult
+            and classification.confidence >= self._classifier_min_confidence()
+        )
+        async with self._classifier_lock:
+            self._classification_cache[cache_key] = (now, matched)
+            self._classification_cache.move_to_end(cache_key)
+            while len(self._classification_cache) > self._classifier_cache_limit():
+                self._classification_cache.popitem(last=False)
+        logger.info(
+            "Group NSFW classification adult=%s confidence=%.2f matched=%s.",
+            classification.adult,
+            classification.confidence,
+            matched,
+        )
+        return matched
+
+    def _classifier_provider_id(self) -> str:
+        return str(
+            self.config.get(
+                "adult_classifier_provider_id",
+                DEFAULT_CLASSIFIER_PROVIDER_ID,
+            )
+            or DEFAULT_CLASSIFIER_PROVIDER_ID
+        ).strip()
+
+    def _classifier_timeout(self) -> float:
+        return self._bounded_float(
+            "adult_classifier_timeout_seconds",
+            8.0,
+            2.0,
+            30.0,
+        )
+
+    def _classifier_min_confidence(self) -> float:
+        return self._bounded_float(
+            "adult_classifier_min_confidence",
+            0.72,
+            0.5,
+            1.0,
+        )
+
+    def _classifier_cache_ttl(self) -> float:
+        return self._bounded_float(
+            "adult_classifier_cache_ttl_seconds",
+            600.0,
+            0.0,
+            3600.0,
+        )
+
+    def _classifier_cache_limit(self) -> int:
+        try:
+            value = int(self.config.get("adult_classifier_cache_max_entries", 256))
+        except (TypeError, ValueError):
+            value = 256
+        return max(16, min(2048, value))
+
+    def _bounded_float(
+        self,
+        name: str,
+        default: float,
+        minimum: float,
+        maximum: float,
+    ) -> float:
+        try:
+            value = float(self.config.get(name, default))
+        except (TypeError, ValueError):
+            value = default
+        return max(minimum, min(maximum, value))
 
     async def _set_enabled(
         self,

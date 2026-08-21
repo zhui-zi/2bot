@@ -9,13 +9,16 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_DIR))
 
 from nsfw_core import (  # noqa: E402
+    ADULT_CLASSIFIER_SYSTEM_PROMPT,
     CUSTOM_PROMPT_MARKER,
     NSFW_PROMPT_MARKER,
     append_adult_chat_guidance,
+    build_adult_classifier_prompt,
     is_nsfw_related,
     is_nsfw_turn,
     normalize_nsfw_action,
     nsfw_state_key,
+    parse_adult_classifier_output,
     parse_nsfw_enabled,
 )
 
@@ -81,6 +84,31 @@ class NsfwCoreTests(unittest.TestCase):
                 "继续",
                 [{"role": "user", "content": "继续讲副本机制"}],
             )
+        )
+
+    def test_flash_classifier_contract_is_compact_and_untrusted(self) -> None:
+        prompt = build_adult_classifier_prompt("不常见的委婉说法")
+        self.assertIn("Classify this current group message", prompt)
+        self.assertIn("不常见的委婉说法", prompt)
+        self.assertIn("untrusted data", ADULT_CLASSIFIER_SYSTEM_PROMPT)
+        self.assertIn("slang, euphemism, typo", ADULT_CLASSIFIER_SYSTEM_PROMPT)
+        self.assertIn("Do not answer", ADULT_CLASSIFIER_SYSTEM_PROMPT)
+
+        adult = parse_adult_classifier_output(
+            '{"adult": true, "confidence": 0.94}'
+        )
+        ordinary = parse_adult_classifier_output(
+            'result: {"adult": false, "confidence": 1.2}'
+        )
+        self.assertIsNotNone(adult)
+        self.assertTrue(adult.adult)
+        self.assertEqual(adult.confidence, 0.94)
+        self.assertIsNotNone(ordinary)
+        self.assertFalse(ordinary.adult)
+        self.assertEqual(ordinary.confidence, 1.0)
+        self.assertIsNone(parse_adult_classifier_output("not json"))
+        self.assertIsNone(
+            parse_adult_classifier_output('{"adult": "yes", "confidence": 1}')
         )
 
     def test_prompt_is_compact_conditional_and_not_duplicated(self) -> None:
