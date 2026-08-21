@@ -39,7 +39,7 @@ from .nsfw_core import (
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.1.0",
+    "1.1.1",
 )
 class GroupNsfwUnlock(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -83,11 +83,20 @@ class GroupNsfwUnlock(Star):
     ) -> None:
         if event.get_extra(NSFW_EVENT_EXTRA) != NSFW_EVENT_VALUE:
             return
+        relationship_stage = event.get_extra(RELATIONSHIP_STAGE_EXTRA) or "new"
+        custom_prompt = self.config.get("custom_nsfw_prompt", "")
         request.system_prompt = append_adult_chat_guidance(
             request.system_prompt,
-            relationship_stage=event.get_extra(RELATIONSHIP_STAGE_EXTRA),
+            relationship_stage=relationship_stage,
             romance_opt_out=bool(event.get_extra(ROMANCE_OPT_OUT_EXTRA)),
-            custom_prompt=self.config.get("custom_nsfw_prompt", ""),
+            custom_prompt=custom_prompt,
+        )
+        logger.info(
+            "Applied group NSFW prompt platform=%s group=%s stage=%s custom=%s.",
+            event.get_platform_name(),
+            event_group_id(event),
+            relationship_stage,
+            bool(str(custom_prompt or "").strip()),
         )
 
     @filter.command("nsfw", alias={"成人模式"}, priority=950)

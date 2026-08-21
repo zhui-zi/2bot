@@ -46,12 +46,16 @@ class NsfwCoreTests(unittest.TestCase):
             "避孕套应该怎么选尺寸？",
             "讨论 BDSM 中的知情同意",
             "想摸你的胸",
+            "阿尔博特下面大不大",
+            "机器人那里到底有多长",
         )
         negatives = (
             "今天开车去图书馆",
             "这件衣服是成人尺码",
             "他们关系很亲密",
             "继续讲绝本机制",
+            "阿尔博特下面这段字体大不大",
+            "机器人下面这个按钮有多大",
         )
         for message in positives:
             with self.subTest(message=message):

@@ -31,6 +31,12 @@ _DIRECT_SEXUAL_RE = re.compile(
     r"(?:发|给我|让我看|看看)(?:裸照|私密照|内裤照|色图|裸体)|"
     r"(?:操|肏|艹|草|日|干)(?:你|我|他|她|ta|机器人)"
 )
+_TARGETED_EUPHEMISM_RE = re.compile(
+    r"(?:你|机器人|bot|阿尔博特|塔塔露).{0,6}"
+    r"(?:下面|那里|那根|那玩意)(?:到底|究竟)?"
+    r"(?:有|是)?(?:大不大|多大|长不长|多长|硬不硬)",
+    re.I,
+)
 _CONTINUATION_RE = re.compile(
     r"^(?:继续|接着|然后呢|再来|再来点|往下写|续写|别停|就这样|可以更详细点吗)[吧呀啊呢嘛～~。.！!？?]*$"
 )
@@ -145,6 +151,7 @@ def is_nsfw_related(message: object) -> bool:
         _NSFW_RE.search(normalized)
         or _ADULT_INTIMACY_RE.search(normalized)
         or _DIRECT_SEXUAL_RE.search(normalized)
+        or _TARGETED_EUPHEMISM_RE.search(normalized)
     )
 
 
