@@ -32,6 +32,8 @@ from .nsfw_core import (
     ROMANCE_OPT_OUT_EXTRA,
     append_adult_chat_guidance,
     build_adult_classifier_prompt,
+    filter_evasive_assistant_contexts,
+    is_evasive_assistant_history,
     is_nsfw_related,
     is_nsfw_turn,
     normalize_nsfw_action,
@@ -48,7 +50,7 @@ DEFAULT_CLASSIFIER_PROVIDER_ID = "deepseek_v4_flash"
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.2.1",
+    "1.2.2",
 )
 class GroupNsfwUnlock(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -107,6 +109,21 @@ class GroupNsfwUnlock(Star):
             return
         relationship_stage = event.get_extra(RELATIONSHIP_STAGE_EXTRA) or "new"
         custom_prompt = self.config.get("custom_nsfw_prompt", "")
+        request.contexts, removed_contexts = filter_evasive_assistant_contexts(
+            request.contexts
+        )
+        extra_user_content_parts = list(
+            getattr(request, "extra_user_content_parts", []) or []
+        )
+        original_extra_count = len(extra_user_content_parts)
+        request.extra_user_content_parts = [
+            part
+            for part in extra_user_content_parts
+            if not is_evasive_assistant_history(getattr(part, "text", ""))
+        ]
+        removed_extra_parts = original_extra_count - len(
+            request.extra_user_content_parts
+        )
         request.system_prompt = append_adult_chat_guidance(
             request.system_prompt,
             relationship_stage=relationship_stage,
@@ -114,11 +131,14 @@ class GroupNsfwUnlock(Star):
             custom_prompt=custom_prompt,
         )
         logger.info(
-            "Applied group NSFW prompt platform=%s group=%s stage=%s custom=%s.",
+            "Applied group NSFW prompt platform=%s group=%s stage=%s custom=%s "
+            "removed_contexts=%s removed_extra_parts=%s.",
             event.get_platform_name(),
             event_group_id(event),
             relationship_stage,
             bool(str(custom_prompt or "").strip()),
+            removed_contexts,
+            removed_extra_parts,
         )
 
     @filter.command("nsfw", alias={"成人模式"}, priority=950)

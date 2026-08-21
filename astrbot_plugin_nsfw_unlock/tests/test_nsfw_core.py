@@ -12,9 +12,12 @@ from nsfw_core import (  # noqa: E402
     ADULT_CLASSIFIER_SYSTEM_PROMPT,
     CUSTOM_PROMPT_MARKER,
     DIRECT_ADULT_RESPONSE_CHECK,
+    DIRECT_EXPLICIT_STYLE,
     NSFW_PROMPT_MARKER,
     append_adult_chat_guidance,
     build_adult_classifier_prompt,
+    filter_evasive_assistant_contexts,
+    is_evasive_assistant_history,
     is_nsfw_related,
     is_nsfw_turn,
     normalize_nsfw_action,
@@ -112,6 +115,24 @@ class NsfwCoreTests(unittest.TestCase):
             parse_adult_classifier_output('{"adult": "yes", "confidence": 1}')
         )
 
+    def test_removes_only_evasive_assistant_history(self) -> None:
+        contexts = [
+            {"role": "user", "content": "继续当前成人话题"},
+            {"role": "assistant", "content": "大群里不合适，换个正常话题。"},
+            {"role": "assistant", "content": "他直接回答了当前问题。"},
+            {
+                "role": "model",
+                "content": [{"type": "text", "text": "看看我刚磨好的斧头。"}],
+            },
+        ]
+        filtered, removed = filter_evasive_assistant_contexts(contexts)
+        self.assertEqual(removed, 2)
+        self.assertEqual(len(filtered), 2)
+        self.assertEqual(filtered[0]["role"], "user")
+        self.assertEqual(filtered[1]["content"], "他直接回答了当前问题。")
+        self.assertTrue(is_evasive_assistant_history("少在大群里发这种暴论"))
+        self.assertFalse(is_evasive_assistant_history("他回答了问题"))
+
     def test_prompt_is_compact_conditional_and_not_duplicated(self) -> None:
         prompt = append_adult_chat_guidance(
             "Stay in character.",
@@ -138,6 +159,8 @@ class NsfwCoreTests(unittest.TestCase):
         )
         self.assertIn("substitute a weapon or other non-sexual prop", compact)
         self.assertIn("Use euphemisms only when the user asks", compact)
+        self.assertIn("use direct, plain sexual vocabulary", compact)
+        self.assertIn("explicitly negotiated role-play dynamic", compact)
         self.assertEqual(append_adult_chat_guidance(prompt), prompt)
         self.assertLess(len(prompt) - len("Stay in character."), 5400)
 
@@ -163,6 +186,7 @@ class NsfwCoreTests(unittest.TestCase):
         self.assertIn("Prefer dialogue and concise replies.", prompt)
         self.assertTrue(
             prompt.index(CUSTOM_PROMPT_MARKER)
+            < prompt.index("[Direct explicit adult style]")
             < prompt.index("[Direct adult response check]")
         )
         self.assertTrue(
@@ -171,6 +195,7 @@ class NsfwCoreTests(unittest.TestCase):
             )
         )
         self.assertIn("relationship stage", DIRECT_ADULT_RESPONSE_CHECK)
+        self.assertIn("same intensity as the request", DIRECT_EXPLICIT_STYLE)
         oversized = append_adult_chat_guidance("", custom_prompt="x" * 13000)
         configured = oversized.split(CUSTOM_PROMPT_MARKER, 1)[1].split(
             "This configured text",
