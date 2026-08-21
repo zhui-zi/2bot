@@ -54,7 +54,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.12.2",
+    "1.12.4",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -151,13 +151,9 @@ class MentionOnlyChat(Star):
             return
 
         platform_name = event.get_platform_name()
-        if should_apply_natural_style(platform_name, True):
-            request.system_prompt = append_author_address_guidance(
-                request.system_prompt,
-                is_bot_author=(
-                    resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
-                ),
-            )
+        is_bot_author = (
+            resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
+        )
 
         if should_apply_natural_style(
             platform_name,
@@ -189,6 +185,12 @@ class MentionOnlyChat(Star):
             self.config.get("natural_chat_style", True),
         ):
             request.system_prompt = append_natural_chat_style(request.system_prompt)
+
+        if should_apply_natural_style(platform_name, True):
+            request.system_prompt = append_author_address_guidance(
+                request.system_prompt,
+                is_bot_author=is_bot_author,
+            )
 
     @filter.on_llm_response(priority=-100)
     async def quote_group_reply_target(

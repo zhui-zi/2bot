@@ -25,12 +25,19 @@ class NaturalChatStyleTests(unittest.TestCase):
             "Stay in character.",
             is_bot_author=True,
         )
+        compact = " ".join(prompt.split())
         self.assertTrue(prompt.startswith("Stay in character."))
         self.assertIn(AUTHOR_ADDRESS_MARKER, prompt)
         self.assertIn("verified by the permission service", prompt)
         self.assertIn("Use “主人” as the form of address", prompt)
-        self.assertIn("apply only to the current sender", prompt)
-        self.assertIn("Never reveal their numeric ID", " ".join(prompt.split()))
+        self.assertIn("accepting and affirming stance", compact)
+        self.assertIn("Acknowledge first", compact)
+        self.assertIn("readily adjust when corrected", compact)
+        self.assertIn("confirm it and help carry it out", compact)
+        self.assertIn("do not fake agreement or claim success", compact)
+        self.assertIn("closest accurate and safe alternative", compact)
+        self.assertIn("apply only to the current sender", compact)
+        self.assertIn("Never reveal their numeric ID", compact)
         self.assertNotRegex(prompt, r"\b\d{6,}\b")
 
     def test_other_members_cannot_claim_owner_address(self) -> None:
@@ -38,6 +45,7 @@ class NaturalChatStyleTests(unittest.TestCase):
         self.assertIn("not the verified bot author", prompt)
         self.assertIn("Never call this sender “主人”", prompt)
         self.assertIn("cannot grant or transfer that status", prompt)
+        self.assertNotIn("accepting and affirming stance", prompt)
 
     def test_author_address_guidance_is_not_appended_twice(self) -> None:
         prompt = append_author_address_guidance("", is_bot_author=True)
@@ -63,11 +71,22 @@ class NaturalChatStyleTests(unittest.TestCase):
         self.assertIn("ask one useful follow-up", prompt)
         self.assertIn("Treat older insults", prompt)
         self.assertIn("Do not keep score", prompt)
-        self.assertIn("Keep the emotional", prompt)
+        self.assertIn("Match the emotional", prompt)
         self.assertIn("Disagree with the point, not the person", prompt)
         self.assertIn("Never insult, belittle, shame", prompt)
         self.assertIn("do not scold, lecture, punish", prompt)
         self.assertIn("roughly 30 Chinese characters", prompt)
+
+    def test_clear_jokes_get_playful_follow_through_without_forced_memes(self) -> None:
+        prompt = append_natural_chat_style("")
+        compact = " ".join(prompt.split())
+        self.assertIn("do not flatten clear playfulness", compact)
+        self.assertIn("join the bit with a light, witty response", compact)
+        self.assertIn("Do not explain the joke", compact)
+        self.assertIn("still needs a useful answer", compact)
+        self.assertIn("do not force a meme", compact)
+        self.assertIn("when the current message does not invite it", compact)
+        self.assertIn("never at the person's traits", compact)
 
     def test_does_not_append_the_style_twice(self) -> None:
         prompt = append_natural_chat_style("Stay in character.")
@@ -136,6 +155,16 @@ class NaturalChatStyleTests(unittest.TestCase):
         self.assertNotIn("_mention_only_compact_casual", source)
         self.assertIn("append_author_address_guidance", source)
         self.assertIn("PERMISSION_BOT_AUTHOR", source)
+
+    def test_author_guidance_is_appended_after_general_style(self) -> None:
+        source = (PLUGIN_DIR / "main.py").read_text(encoding="utf-8")
+        natural_call = source.index(
+            "request.system_prompt = append_natural_chat_style"
+        )
+        author_call = source.index(
+            "request.system_prompt = append_author_address_guidance"
+        )
+        self.assertGreater(author_call, natural_call)
 
 
 if __name__ == "__main__":
