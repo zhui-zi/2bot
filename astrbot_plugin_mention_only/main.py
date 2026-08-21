@@ -39,9 +39,11 @@ from .affinity import (
     affinity_state_key,
     append_relationship_guidance,
     parse_affinity_state,
+    parse_affinity_score,
     private_state_probe_kind,
     resolve_management_target,
     relationship_stage,
+    set_affinity_score,
 )
 from .chat_style import (
     append_author_address_guidance,
@@ -55,7 +57,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.14.0",
+    "1.15.0",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -81,7 +83,8 @@ class MentionOnlyChat(Star):
             return
         if self._can_manage_affinity(event):
             yield event.plain_result(
-                "管理员请使用 /affinity status|reset，并回复或 @ 目标用户。"
+                "管理员请使用 /affinity status|reset，并回复或 @ 目标用户；"
+                "机器人作者还可使用 set。"
             )
         elif probe_kind == "affinity":
             yield event.plain_result("哪有这种数值。相处得怎么样，你自己感觉不出来？")
@@ -254,23 +257,70 @@ class MentionOnlyChat(Star):
         event: AstrMessageEvent,
         action: str = "status",
         target_id: str = "",
+        score_value: str = "",
     ):
-        management_scope = self._affinity_management_scope(event)
+        normalized_action = str(action or "status").casefold().strip()
+        status_actions = {"status", "query", "状态", "查询"}
+        reset_actions = {"reset", "clear", "重置", "清空"}
+        set_actions = {"set", "设置", "调整"}
+        if normalized_action not in status_actions | reset_actions | set_actions:
+            yield event.plain_result(
+                "用法：/affinity status|reset [用户ID]；机器人作者可用 "
+                "/affinity set <用户ID> <0-100>，或回复/@目标后使用 "
+                "/affinity set <0-100>。"
+            )
+            return
+        permission = resolve_event_permission(event)
+        if (
+            normalized_action in set_actions
+            and permission.level != PERMISSION_BOT_AUTHOR
+        ):
+            yield event.plain_result("权限不足：仅机器人作者可以设置好感度。")
+            return
+        management_scope = permission_management_scope(permission)
         if management_scope == "none":
             yield event.plain_result(
                 "权限不足：仅机器人作者、AstrBot 管理员或当前群群主/管理员可操作。"
             )
             return
-        normalized_action = str(action or "status").casefold().strip()
-        status_actions = {"status", "query", "状态", "查询"}
-        reset_actions = {"reset", "clear", "重置", "清空"}
-        if normalized_action not in status_actions | reset_actions:
-            yield event.plain_result(
-                "用法：/affinity status|reset [用户ID]，也可以回复或 @ 目标用户。"
-            )
-            return
         explicit_target = str(target_id or "").strip()
         message_target = self._affinity_target(event)
+        if normalized_action in set_actions:
+            if message_target:
+                target = message_target
+                raw_score = explicit_target
+                if str(score_value or "").strip():
+                    yield event.plain_result(
+                        "回复或 @ 目标用户时，请使用 /affinity set <0-100>。"
+                    )
+                    return
+            else:
+                target = explicit_target
+                raw_score = str(score_value or "").strip()
+            score = parse_affinity_score(raw_score)
+            if not target or score is None:
+                yield event.plain_result(
+                    "用法：/affinity set <用户ID> <0-100>；也可以回复或 "
+                    "@ 目标用户后使用 /affinity set <0-100>。"
+                )
+                return
+            state = await self._set_affinity_score(
+                event.get_platform_name(),
+                target,
+                score,
+            )
+            stage = relationship_stage(
+                state,
+                romance_enabled=bool(
+                    self.config.get("hidden_romance_enabled", True)
+                ),
+            )
+            stage_name = self._relationship_stage_name(stage)
+            yield event.plain_result(
+                f"已将用户 {target} 的好感设置为 {state.score:.1f}/100"
+                f"（{stage_name}）。恋爱信号与拒绝恋爱化状态保持不变。"
+            )
+            return
         target, target_error = resolve_management_target(
             management_scope,
             event.get_sender_id(),
@@ -295,14 +345,7 @@ class MentionOnlyChat(Star):
             state,
             romance_enabled=bool(self.config.get("hidden_romance_enabled", True)),
         )
-        stage_name = {
-            "new": "初识",
-            "familiar": "熟悉",
-            "trusted": "信任",
-            "close": "亲近",
-            "romantic": "恋爱",
-            "devoted": "深度恋爱",
-        }.get(stage, stage)
+        stage_name = self._relationship_stage_name(stage)
         last_seen = "从未互动"
         if state.last_seen_at:
             last_seen = datetime.fromtimestamp(
@@ -381,11 +424,37 @@ class MentionOnlyChat(Star):
             await self.put_kv_data(key, state.to_dict())
             self._affinity_cache[key] = state
 
+    async def _set_affinity_score(
+        self,
+        platform_name: object,
+        sender_id: object,
+        score: float,
+    ) -> AffinityState:
+        key = affinity_state_key(platform_name, sender_id)
+        async with self._affinity_lock:
+            state = await self._load_affinity_state_locked(key)
+            updated = set_affinity_score(state, score)
+            await self.put_kv_data(key, updated.to_dict())
+            self._affinity_cache[key] = updated
+            return updated
+
     def _can_manage_affinity(self, event: AstrMessageEvent) -> bool:
         return self._affinity_management_scope(event) != "none"
 
     def _affinity_management_scope(self, event: AstrMessageEvent) -> str:
         return permission_management_scope(resolve_event_permission(event))
+
+    @staticmethod
+    def _relationship_stage_name(stage: object) -> str:
+        normalized = str(stage or "")
+        return {
+            "new": "初识",
+            "familiar": "熟悉",
+            "trusted": "信任",
+            "close": "亲近",
+            "romantic": "恋爱",
+            "devoted": "深度恋爱",
+        }.get(normalized, normalized)
 
     @staticmethod
     def _is_group_event(event: AstrMessageEvent) -> bool:

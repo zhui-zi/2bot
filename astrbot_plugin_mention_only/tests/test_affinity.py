@@ -16,9 +16,11 @@ from affinity import (  # noqa: E402
     append_relationship_guidance,
     looks_private_state_probe,
     parse_affinity_state,
+    parse_affinity_score,
     private_state_probe_kind,
     resolve_management_target,
     relationship_stage,
+    set_affinity_score,
 )
 
 
@@ -46,6 +48,29 @@ class AffinityStateTests(unittest.TestCase):
         self.assertEqual(state.gain_today, 1.5)
         self.assertEqual(parse_affinity_state({"score": 12}).score, 12.0)
         self.assertEqual(state.to_dict()["version"], 2)
+
+    def test_author_score_parser_requires_zero_to_one_hundred(self) -> None:
+        self.assertEqual(parse_affinity_score("７５．５"), 75.5)
+        self.assertEqual(parse_affinity_score("100"), 100.0)
+        self.assertEqual(parse_affinity_score("0"), 0.0)
+        self.assertIsNone(parse_affinity_score("100.1"))
+        self.assertIsNone(parse_affinity_score("-1"))
+        self.assertIsNone(parse_affinity_score("nan"))
+
+    def test_manual_score_preserves_other_relationship_state(self) -> None:
+        original = AffinityState(
+            score=12,
+            positive_interactions=9,
+            romance_signals=4,
+            romance_opt_out=True,
+            last_seen_at=1234,
+        )
+        updated = set_affinity_score(original, "80.5")
+        self.assertEqual(updated.score, 80.5)
+        self.assertEqual(updated.positive_interactions, 9)
+        self.assertEqual(updated.romance_signals, 4)
+        self.assertTrue(updated.romance_opt_out)
+        self.assertEqual(updated.last_seen_at, 1234)
 
     def test_state_key_does_not_expose_sender_identity(self) -> None:
         key = affinity_state_key("aiocqhttp", "123456789")

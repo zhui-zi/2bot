@@ -139,6 +139,23 @@ def parse_affinity_state(raw: object) -> AffinityState:
     )
 
 
+def parse_affinity_score(value: object) -> float | None:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip()
+    if not re.fullmatch(r"(?:\d+(?:\.\d+)?)", normalized):
+        return None
+    parsed = float(normalized)
+    if parsed < MIN_SCORE or parsed > MAX_SCORE:
+        return None
+    return round(parsed, 1)
+
+
+def set_affinity_score(state: AffinityState, score: object) -> AffinityState:
+    parsed = parse_affinity_score(score)
+    if parsed is None:
+        raise ValueError("Affinity score must be between 0 and 100.")
+    return replace(state, score=parsed)
+
+
 def affinity_state_key(platform_name: object, sender_id: object) -> str:
     identity = "|".join(
         (

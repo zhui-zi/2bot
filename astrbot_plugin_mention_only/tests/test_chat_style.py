@@ -166,6 +166,12 @@ class NaturalChatStyleTests(unittest.TestCase):
         )
         self.assertGreater(author_call, natural_call)
 
+    def test_only_verified_author_can_set_affinity_score(self) -> None:
+        source = (PLUGIN_DIR / "main.py").read_text(encoding="utf-8")
+        self.assertIn("permission.level != PERMISSION_BOT_AUTHOR", source)
+        self.assertIn("仅机器人作者可以设置好感度", source)
+        self.assertIn("parse_affinity_score", source)
+
 
 if __name__ == "__main__":
     unittest.main()
