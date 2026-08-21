@@ -185,7 +185,8 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
         self.plugin = self.plugin_module.GroupNsfwUnlock(
             self.context,
             {
-                "custom_nsfw_prompt": "Prefer concise dialogue.",
+                "nsfw_prompt_prefix": "Custom prefix.",
+                "nsfw_prompt_suffix": "Custom suffix.",
                 "adult_classifier_enabled": True,
                 "adult_classifier_provider_id": "deepseek_v4_flash",
             },
@@ -231,7 +232,20 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.inject_adult_prompt(adult_event, adult_request)
         self.assertIn("[Group adult-content mode]", adult_request.system_prompt)
         self.assertIn("current relationship stage is trusted", adult_request.system_prompt)
-        self.assertIn("Prefer concise dialogue.", adult_request.system_prompt)
+        self.assertTrue(
+            adult_request.system_prompt.startswith(
+                "[Author-configured NSFW prefix]\nCustom prefix."
+            )
+        )
+        self.assertLess(
+            adult_request.system_prompt.index("Custom prefix."),
+            adult_request.system_prompt.index("Persona"),
+        )
+        self.assertTrue(
+            adult_request.system_prompt.endswith(
+                "[Author-configured NSFW suffix]\nCustom suffix."
+            )
+        )
 
         ordinary_event = _FakeEvent(
             sender_id="member",

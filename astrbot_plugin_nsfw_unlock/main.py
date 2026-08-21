@@ -26,6 +26,8 @@ except ImportError:
 
 from .nsfw_core import (
     ADULT_CLASSIFIER_SYSTEM_PROMPT,
+    DEFAULT_NSFW_PROMPT_PREFIX,
+    DEFAULT_NSFW_PROMPT_SUFFIX,
     NSFW_EVENT_EXTRA,
     NSFW_EVENT_VALUE,
     RELATIONSHIP_STAGE_EXTRA,
@@ -50,7 +52,7 @@ DEFAULT_CLASSIFIER_PROVIDER_ID = "deepseek_v4_flash"
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.2.2",
+    "1.3.0",
 )
 class GroupNsfwUnlock(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -108,7 +110,14 @@ class GroupNsfwUnlock(Star):
         if event.get_extra(NSFW_EVENT_EXTRA) != NSFW_EVENT_VALUE:
             return
         relationship_stage = event.get_extra(RELATIONSHIP_STAGE_EXTRA) or "new"
-        custom_prompt = self.config.get("custom_nsfw_prompt", "")
+        prompt_prefix = self.config.get(
+            "nsfw_prompt_prefix",
+            DEFAULT_NSFW_PROMPT_PREFIX,
+        )
+        prompt_suffix = self.config.get(
+            "nsfw_prompt_suffix",
+            DEFAULT_NSFW_PROMPT_SUFFIX,
+        )
         request.contexts, removed_contexts = filter_evasive_assistant_contexts(
             request.contexts
         )
@@ -128,15 +137,18 @@ class GroupNsfwUnlock(Star):
             request.system_prompt,
             relationship_stage=relationship_stage,
             romance_opt_out=bool(event.get_extra(ROMANCE_OPT_OUT_EXTRA)),
-            custom_prompt=custom_prompt,
+            prompt_prefix=prompt_prefix,
+            prompt_suffix=prompt_suffix,
         )
         logger.info(
-            "Applied group NSFW prompt platform=%s group=%s stage=%s custom=%s "
+            "Applied group NSFW prompt platform=%s group=%s stage=%s "
+            "prefix=%s suffix=%s "
             "removed_contexts=%s removed_extra_parts=%s.",
             event.get_platform_name(),
             event_group_id(event),
             relationship_stage,
-            bool(str(custom_prompt or "").strip()),
+            bool(str(prompt_prefix or "").strip()),
+            bool(str(prompt_suffix or "").strip()),
             removed_contexts,
             removed_extra_parts,
         )

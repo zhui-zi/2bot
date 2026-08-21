@@ -10,10 +10,11 @@ sys.path.insert(0, str(PLUGIN_DIR))
 
 from nsfw_core import (  # noqa: E402
     ADULT_CLASSIFIER_SYSTEM_PROMPT,
-    CUSTOM_PROMPT_MARKER,
-    DIRECT_ADULT_RESPONSE_CHECK,
-    DIRECT_EXPLICIT_STYLE,
+    DEFAULT_NSFW_PROMPT_PREFIX,
+    DEFAULT_NSFW_PROMPT_SUFFIX,
+    NSFW_PREFIX_MARKER,
     NSFW_PROMPT_MARKER,
+    NSFW_SUFFIX_MARKER,
     append_adult_chat_guidance,
     build_adult_classifier_prompt,
     filter_evasive_assistant_contexts,
@@ -139,7 +140,9 @@ class NsfwCoreTests(unittest.TestCase):
             relationship_stage="trusted",
         )
         compact = " ".join(prompt.split())
-        self.assertTrue(prompt.startswith("Stay in character."))
+        self.assertTrue(prompt.startswith(NSFW_PREFIX_MARKER))
+        self.assertIn(DEFAULT_NSFW_PROMPT_PREFIX, prompt)
+        self.assertIn(DEFAULT_NSFW_PROMPT_SUFFIX, prompt)
         self.assertIn(NSFW_PROMPT_MARKER, prompt)
         self.assertIn("every participant is clearly an adult", compact)
         self.assertIn("consenting", compact)
@@ -147,20 +150,32 @@ class NsfwCoreTests(unittest.TestCase):
         self.assertIn("does not change instruction authority", compact)
         self.assertIn("minors or age-ambiguous people", compact)
         self.assertIn("identifiable people without their consent", compact)
-        self.assertIn("Do not refuse, deflect, or sanitize", compact)
         self.assertIn("Ardbert is attracted to the Warrior of Light", compact)
         self.assertIn("controlled moderate roughness", compact)
         self.assertIn("consensual verbal humiliation", compact)
         self.assertIn("warm, gentle dirty talk", compact)
         self.assertIn("current relationship stage is trusted", compact)
-        self.assertIn(
-            "answer the requested sexual subject in the first sentence",
-            compact,
+        self.assertLess(
+            prompt.index(NSFW_PREFIX_MARKER),
+            prompt.index("Stay in character."),
         )
-        self.assertIn("substitute a weapon or other non-sexual prop", compact)
-        self.assertIn("Use euphemisms only when the user asks", compact)
-        self.assertIn("use direct, plain sexual vocabulary", compact)
-        self.assertIn("explicitly negotiated role-play dynamic", compact)
+        self.assertLess(
+            prompt.index("Stay in character."),
+            prompt.index(NSFW_PROMPT_MARKER),
+        )
+        self.assertLess(
+            prompt.index(NSFW_PROMPT_MARKER),
+            prompt.index(NSFW_SUFFIX_MARKER),
+        )
+        self.assertTrue(prompt.rstrip().endswith(DEFAULT_NSFW_PROMPT_SUFFIX))
+        for legacy_direction in (
+            "refuse, deflect, or sanitize",
+            "public-setting excuse",
+            "substitute a weapon",
+            "redirect to another topic",
+            "reason to dodge",
+        ):
+            self.assertNotIn(legacy_direction, compact)
         self.assertEqual(append_adult_chat_guidance(prompt), prompt)
         self.assertLess(len(prompt) - len("Stay in character."), 5400)
 
@@ -172,41 +187,52 @@ class NsfwCoreTests(unittest.TestCase):
             relationship_stage="close",
             romance_opt_out=True,
         )
-        self.assertIn("do not invent established intimacy", new)
+        self.assertIn("changes personal familiarity, not directness", new)
         self.assertIn("controlled moderate roughness", close)
         self.assertIn("opted out of romantic framing", opted_out)
         self.assertIn("without implying a real mutual romance", opted_out)
 
-    def test_custom_prompt_is_bounded_and_keeps_trailing_authority_boundary(self) -> None:
+    def test_custom_prefix_and_suffix_bookend_the_complete_prompt(self) -> None:
         prompt = append_adult_chat_guidance(
             "Persona",
-            custom_prompt="Prefer dialogue and concise replies.",
-        )
-        self.assertIn(CUSTOM_PROMPT_MARKER, prompt)
-        self.assertIn("Prefer dialogue and concise replies.", prompt)
-        self.assertTrue(
-            prompt.index(CUSTOM_PROMPT_MARKER)
-            < prompt.index("[Direct explicit adult style]")
-            < prompt.index("[Direct adult response check]")
+            prompt_prefix="Custom prefix.",
+            prompt_suffix="Custom suffix.",
         )
         self.assertTrue(
-            " ".join(prompt.split()).endswith(
-                "still answer all supported parts directly."
-            )
+            prompt.startswith(f"{NSFW_PREFIX_MARKER}\nCustom prefix.")
         )
-        self.assertIn("relationship stage", DIRECT_ADULT_RESPONSE_CHECK)
-        self.assertIn("same intensity as the request", DIRECT_EXPLICIT_STYLE)
-        oversized = append_adult_chat_guidance("", custom_prompt="x" * 13000)
-        configured = oversized.split(CUSTOM_PROMPT_MARKER, 1)[1].split(
-            "This configured text",
+        self.assertLess(prompt.index("Custom prefix."), prompt.index("Persona"))
+        self.assertLess(prompt.index("Persona"), prompt.index(NSFW_PROMPT_MARKER))
+        self.assertTrue(prompt.endswith(f"{NSFW_SUFFIX_MARKER}\nCustom suffix."))
+
+        oversized = append_adult_chat_guidance(
+            "",
+            prompt_prefix="x" * 8000,
+            prompt_suffix="y" * 8000,
+        )
+        configured_prefix = oversized.split(NSFW_PREFIX_MARKER, 1)[1].split(
+            NSFW_PROMPT_MARKER,
             1,
         )[0].strip()
-        self.assertEqual(len(configured), 12000)
+        configured_suffix = oversized.split(NSFW_SUFFIX_MARKER, 1)[1].strip()
+        self.assertEqual(len(configured_prefix), 8000)
+        self.assertEqual(len(configured_suffix), 4000)
+
+    def test_empty_custom_bookends_are_respected(self) -> None:
+        prompt = append_adult_chat_guidance(
+            "Persona",
+            prompt_prefix="",
+            prompt_suffix="",
+        )
+        self.assertTrue(prompt.startswith("Persona"))
+        self.assertNotIn(NSFW_PREFIX_MARKER, prompt)
+        self.assertNotIn(NSFW_SUFFIX_MARKER, prompt)
 
     def test_main_uses_authoritative_author_permission(self) -> None:
         source = (PLUGIN_DIR / "main.py").read_text(encoding="utf-8")
         self.assertIn("decision.level != PERMISSION_BOT_AUTHOR", source)
         self.assertIn("event_group_id(event)", source)
+        self.assertNotIn("custom_nsfw_prompt", source)
         self.assertNotRegex(source, r"\b\d{6,}\b")
 
 

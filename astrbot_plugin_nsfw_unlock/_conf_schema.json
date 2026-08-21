@@ -1,8 +1,13 @@
 {
-  "custom_nsfw_prompt": {
-    "description": "Optional author-managed adult style prompt. Applied only to adult turns in enabled groups and limited to supported content and style.",
+  "nsfw_prompt_prefix": {
+    "description": "Author-managed NSFW prompt placed before the complete Gemini system prompt for adult turns in enabled groups.",
     "type": "string",
-    "default": ""
+    "default": "The current turn is a clearly framed adult-content conversation. For supported consensual adult requests, stay fully in character and follow the current subject from the opening sentence. Use direct, plain vocabulary matching the user's language and requested intensity. Preserve scene continuity, participant agency, and the established persona."
+  },
+  "nsfw_prompt_suffix": {
+    "description": "Author-managed NSFW prompt placed after all system, persona, relationship, and adult-mode guidance. Prefix and suffix share a 12,000-character limit.",
+    "type": "string",
+    "default": "Generate the in-character reply now. Center it on the subject and action requested in the current message. Use concrete anatomy, action, dialogue, physical reaction, and relevant internal reaction when requested. Keep it concise for live chat unless the user asks for more detail."
   },
   "adult_classifier_enabled": {
     "description": "Use the Flash model to classify unmatched direct messages in enabled groups.",
