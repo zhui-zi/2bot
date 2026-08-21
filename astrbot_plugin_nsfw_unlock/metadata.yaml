@@ -1,7 +1,7 @@
 name: group_nsfw_unlock
 display_name: Group NSFW Unlock
 desc: Adds author-controlled, group-scoped adult-content prompting.
-version: v1.1.1
+version: v1.1.2
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

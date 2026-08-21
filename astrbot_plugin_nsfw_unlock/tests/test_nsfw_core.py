@@ -48,6 +48,9 @@ class NsfwCoreTests(unittest.TestCase):
             "想摸你的胸",
             "阿尔博特下面大不大",
             "机器人那里到底有多长",
+            "你下面大吗",
+            "看看逼",
+            "给我看你的鸡巴吧",
         )
         negatives = (
             "今天开车去图书馆",
@@ -56,6 +59,8 @@ class NsfwCoreTests(unittest.TestCase):
             "继续讲绝本机制",
             "阿尔博特下面这段字体大不大",
             "机器人下面这个按钮有多大",
+            "你下面这个字大吗",
+            "看看逼迫人的新闻",
         )
         for message in positives:
             with self.subTest(message=message):
