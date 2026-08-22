@@ -39,6 +39,7 @@ from .memory_core import (
     filter_identity_bound_contexts,
     filter_durable_records,
     find_nickname_relations,
+    has_identity_bound_history,
     is_allowlisted_group,
     looks_sensitive,
     looks_transient_negative,
@@ -46,7 +47,6 @@ from .memory_core import (
     normalize_record_text,
     parse_record,
     render_context,
-    render_current_speaker,
     render_current_turn,
     render_group_roster,
     select_records,
@@ -60,7 +60,7 @@ STATE_VERSION = 5
     "group_persistent_memory",
     "keita",
     "Keeps isolated persistent chat memory for allowlisted QQ groups.",
-    "1.6.0",
+    "1.6.1",
 )
 class GroupPersistentMemory(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -115,6 +115,7 @@ class GroupPersistentMemory(Star):
             return
         if self.config.get("drop_ambiguous_native_context", True):
             request.contexts = filter_identity_bound_contexts(request.contexts)
+        has_native_history = has_identity_bound_history(request.contexts)
         current_sender_id = str(event.get_sender_id() or "")
         current_sender_name = self._sender_name(event)
         original_prompt = str(request.prompt or "")
@@ -141,19 +142,11 @@ class GroupPersistentMemory(Star):
             original_prompt or current_text,
             relations=current_relations,
         )
-        request.extra_user_content_parts.append(
-            TextPart(
-                text=render_current_speaker(
-                    current_sender_id,
-                    current_sender_name,
-                )
-            ).mark_as_temp()
-        )
         roster_text = render_group_roster(
             records,
             current_sender_id=current_sender_id,
             current_sender_name=current_sender_name,
-            max_members=self._bounded("max_roster_members", 30, 5, 100),
+            max_members=self._bounded("max_roster_members", 12, 5, 30),
         )
         if roster_text:
             request.extra_user_content_parts.append(
@@ -165,10 +158,14 @@ class GroupPersistentMemory(Star):
             records,
             "\n".join(query_parts),
             current_sender_id=current_sender_id,
-            max_relevant=self._bounded("max_relevant_records", 6, 0, 20),
-            recent_count=self._bounded("recent_records", 4, 0, 12),
-            personal_count=self._bounded("personal_records", 2, 0, 8),
-            max_chars=self._bounded("max_injected_chars", 5000, 500, 12000),
+            max_relevant=self._bounded("max_relevant_records", 4, 0, 12),
+            recent_count=(
+                0 if has_native_history else self._bounded("recent_records", 3, 0, 8)
+            ),
+            personal_count=(
+                0 if has_native_history else self._bounded("personal_records", 2, 0, 6)
+            ),
+            max_chars=self._bounded("max_injected_chars", 2500, 500, 5000),
         )
         context_text = render_context(selected)
         if context_text:
@@ -179,9 +176,9 @@ class GroupPersistentMemory(Star):
             long_term_memories,
             "\n".join(query_parts),
             current_sender_id=current_sender_id,
-            relevant_count=self._bounded("long_term_relevant_memories", 4, 0, 12),
-            personal_count=self._bounded("long_term_personal_memories", 3, 0, 10),
-            max_chars=self._bounded("long_term_injected_chars", 1800, 300, 5000),
+            relevant_count=self._bounded("long_term_relevant_memories", 3, 0, 8),
+            personal_count=self._bounded("long_term_personal_memories", 2, 0, 6),
+            max_chars=self._bounded("long_term_injected_chars", 900, 300, 2500),
             half_life_days=self._bounded("long_term_half_life_days", 180, 7, 3650),
         )
         long_term_text = render_long_term_memories(selected_long_term)

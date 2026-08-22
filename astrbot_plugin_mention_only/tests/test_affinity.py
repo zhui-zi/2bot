@@ -303,7 +303,8 @@ class RelationshipPromptTests(unittest.TestCase):
         self.assertIn("choose the less intimate behavior without becoming cold", normalized)
         self.assertIn("Restraint applies to intimacy, not ordinary friendliness", normalized)
         self.assertIn("Never assume physical contact", normalized)
-        self.assertIn("Strong emotion requires stable, repeated evidence", normalized)
+        self.assertIn("strong emotion requires stable, repeated evidence", normalized)
+        self.assertLessEqual(len(prompt) - len("Stay in character."), 1400)
 
     def test_guidance_is_not_appended_twice(self) -> None:
         prompt = append_relationship_guidance("Stay in character.", "trusted")
@@ -329,7 +330,7 @@ class RelationshipPromptTests(unittest.TestCase):
         trusted = append_relationship_guidance("", "trusted")
         self.assertIn("friendly, peer-level warmth from the start", new)
         self.assertIn("respond with genuine interest", new)
-        self.assertIn("do not act guarded, formal, indifferent", new)
+        self.assertIn("do not act guarded, formal, or indifferent", new)
         self.assertIn("do not invent shared history, deep familiarity", new)
         self.assertIn("remember supplied routine preferences naturally", familiar)
         self.assertIn("follow up on supplied interests", trusted)

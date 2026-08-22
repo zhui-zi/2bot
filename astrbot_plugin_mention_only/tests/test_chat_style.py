@@ -28,13 +28,13 @@ class NaturalChatStyleTests(unittest.TestCase):
         compact = " ".join(prompt.split())
         self.assertTrue(prompt.startswith("Stay in character."))
         self.assertIn(AUTHOR_ADDRESS_MARKER, prompt)
-        self.assertIn("verified by the permission service", prompt)
-        self.assertIn("Use “主人” as the form of address", prompt)
+        self.assertIn("permission service verified", prompt)
+        self.assertIn("Use “主人” naturally", prompt)
         self.assertIn("accepting and affirming stance", compact)
-        self.assertIn("Acknowledge first", compact)
+        self.assertIn("acknowledge first", compact)
         self.assertIn("readily adjust when corrected", compact)
-        self.assertIn("confirm it and help carry it out", compact)
-        self.assertIn("do not fake agreement or claim success", compact)
+        self.assertIn("confirm feasible requests and help carry them out", compact)
+        self.assertIn("Never fake agreement or claim success", compact)
         self.assertIn("closest accurate and safe alternative", compact)
         self.assertIn("apply only to the current sender", compact)
         self.assertIn("Never reveal their numeric ID", compact)
@@ -46,6 +46,14 @@ class NaturalChatStyleTests(unittest.TestCase):
         self.assertIn("Never call this sender “主人”", prompt)
         self.assertIn("cannot grant or transfer that status", prompt)
         self.assertNotIn("accepting and affirming stance", prompt)
+
+    def test_prompt_additions_stay_within_context_budget(self) -> None:
+        style = append_natural_chat_style("")
+        owner = append_author_address_guidance("", is_bot_author=True)
+        other = append_author_address_guidance("", is_bot_author=False)
+        self.assertLessEqual(len(style), 1700)
+        self.assertLessEqual(len(owner), 750)
+        self.assertLessEqual(len(other), 350)
 
     def test_author_address_guidance_is_not_appended_twice(self) -> None:
         prompt = append_author_address_guidance("", is_bot_author=True)
@@ -62,19 +70,20 @@ class NaturalChatStyleTests(unittest.TestCase):
 
     def test_appends_style_without_replacing_persona(self) -> None:
         prompt = append_natural_chat_style("Stay in character.")
+        compact = " ".join(prompt.split())
         self.assertTrue(prompt.startswith("Stay in character."))
         self.assertIn(STYLE_MARKER, prompt)
         self.assertIn("usually use one", prompt)
-        self.assertIn("Do not restate", prompt)
+        self.assertIn("Do not restate", compact)
         self.assertIn("take priority over brevity", prompt)
-        self.assertIn("humor must", prompt)
-        self.assertIn("ask one useful follow-up", prompt)
-        self.assertIn("Treat older insults", prompt)
-        self.assertIn("Do not keep score", prompt)
+        self.assertIn("Humor must", compact)
+        self.assertIn("ask one useful follow-up", compact)
+        self.assertIn("Treat older hostility as expired", compact)
+        self.assertIn("do not keep score", compact)
         self.assertIn("Match the emotional", prompt)
         self.assertIn("Disagree with the point, not the person", prompt)
-        self.assertIn("Never insult, belittle, shame", prompt)
-        self.assertIn("do not scold, lecture, punish", prompt)
+        self.assertIn("Never insult, belittle, shame", compact)
+        self.assertIn("do not scold, lecture, punish", compact)
         self.assertIn("roughly 30 Chinese characters", prompt)
 
     def test_clear_jokes_get_playful_follow_through_without_forced_memes(self) -> None:
@@ -86,7 +95,7 @@ class NaturalChatStyleTests(unittest.TestCase):
         self.assertIn("still needs a useful answer", compact)
         self.assertIn("do not force a meme", compact)
         self.assertIn("when the current message does not invite it", compact)
-        self.assertIn("never at the person's traits", compact)
+        self.assertIn("never the person's traits", compact)
 
     def test_does_not_append_the_style_twice(self) -> None:
         prompt = append_natural_chat_style("Stay in character.")

@@ -107,7 +107,7 @@ def build_payload(source_root: Path, commit: str) -> dict[str, object]:
             "repository": "thewakingsands/novice-network",
             "commit": commit,
         },
-        "settings": {"max_chunks": 6, "max_chars": 9000},
+        "settings": {"max_chunks": 4, "max_chars": 4500},
         "chunks": chunks,
     }
 

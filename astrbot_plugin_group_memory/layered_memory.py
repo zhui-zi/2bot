@@ -291,9 +291,9 @@ def select_long_term_memories(
     query: object,
     *,
     current_sender_id: str = "",
-    relevant_count: int = 4,
-    personal_count: int = 3,
-    max_chars: int = 1800,
+    relevant_count: int = 3,
+    personal_count: int = 2,
+    max_chars: int = 900,
     now: float | None = None,
     half_life_days: float = 180,
 ) -> tuple[LongTermMemory, ...]:

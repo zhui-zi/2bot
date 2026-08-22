@@ -22,6 +22,8 @@ class KnowledgeCoreTests(unittest.TestCase):
         self.assertIn("basic", categories)
         self.assertIn("duty", categories)
         self.assertGreaterEqual(len(self.knowledge.chunks), 500)
+        self.assertEqual(self.knowledge.max_chunks, 4)
+        self.assertEqual(self.knowledge.max_chars, 4500)
 
     def test_normalization_is_width_and_case_insensitive(self) -> None:
         self.assertEqual(normalize_text("ＦＦＸＩＶ"), "ffxiv")

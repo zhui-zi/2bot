@@ -41,8 +41,8 @@ class KnowledgeChunk:
 class KnowledgeBase:
     chunks: tuple[KnowledgeChunk, ...]
     source_commit: str
-    max_chunks: int = 6
-    max_chars: int = 9000
+    max_chunks: int = 4
+    max_chars: int = 4500
 
 
 class KnowledgeIndex:
@@ -91,6 +91,7 @@ class KnowledgeIndex:
                 score += 80.0
             score += _boss_section_bonus(normalized_query, normalized_heading)
             score += _variant_bonus(normalized_query, normalized_title)
+            score += _pvp_section_bonus(normalized_query, normalized_heading)
             if chunk.document_id.startswith("curated/pvp/") and any(
                 marker in normalized_query
                 for marker in ("pvp", "战场", "纷争前线", "水晶冲突", "昂萨", "碎冰")
@@ -233,6 +234,16 @@ def _variant_bonus(normalized_query: str, normalized_title: str) -> float:
     return score
 
 
+def _pvp_section_bonus(normalized_query: str, normalized_heading: str) -> float:
+    if any(
+        marker in normalized_heading for marker in ("地图列表", "地图辨认")
+    ) and not any(
+        marker in normalized_query for marker in ("地图", "哪些", "有什么")
+    ):
+        return -1000.0
+    return 0.0
+
+
 def load_knowledge(
     path: Path, extensions_path: Path | None = None
 ) -> KnowledgeBase:
@@ -254,8 +265,8 @@ def load_knowledge(
     return KnowledgeBase(
         chunks=chunks,
         source_commit=str(source.get("commit", "")).strip(),
-        max_chunks=max(1, int(settings.get("max_chunks", 6))),
-        max_chars=max(1000, int(settings.get("max_chars", 9000))),
+        max_chunks=max(1, int(settings.get("max_chunks", 4))),
+        max_chars=max(1000, int(settings.get("max_chars", 4500))),
     )
 
 

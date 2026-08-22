@@ -42,17 +42,17 @@
   "long_term_relevant_memories": {
     "description": "Maximum topic-relevant long-term memories injected per request.",
     "type": "int",
-    "default": 4
+    "default": 3
   },
   "long_term_personal_memories": {
     "description": "Maximum learned preferences for the current member injected per request.",
     "type": "int",
-    "default": 3
+    "default": 2
   },
   "long_term_injected_chars": {
     "description": "Maximum long-term memory characters injected per request.",
     "type": "int",
-    "default": 1800
+    "default": 900
   },
   "forget_negative_messages": {
     "description": "Do not retain harassment, hostility, transient negative emotions, or grudge-like replies.",
@@ -72,12 +72,12 @@
   "max_relevant_records": {
     "description": "Maximum relevant historical records injected into each LLM request.",
     "type": "int",
-    "default": 6
+    "default": 4
   },
   "recent_records": {
     "description": "Number of recent group records injected for conversational continuity.",
     "type": "int",
-    "default": 4
+    "default": 3
   },
   "personal_records": {
     "description": "Number of recent records involving the current member injected alongside shared group context.",
@@ -87,11 +87,11 @@
   "max_roster_members": {
     "description": "Maximum recently observed group members included in the nickname roster.",
     "type": "int",
-    "default": 30
+    "default": 12
   },
   "max_injected_chars": {
     "description": "Maximum persistent-memory characters injected into each LLM request.",
     "type": "int",
-    "default": 5000
+    "default": 2500
   }
 }

@@ -244,10 +244,10 @@ def select_records(
     query: str,
     *,
     current_sender_id: str = "",
-    max_relevant: int = 6,
-    recent_count: int = 4,
+    max_relevant: int = 4,
+    recent_count: int = 3,
     personal_count: int = 2,
-    max_chars: int = 5000,
+    max_chars: int = 2500,
     now: float | None = None,
 ) -> tuple[MemoryRecord, ...]:
     normalized_query = normalize_record_text(query, 1000)
@@ -466,6 +466,18 @@ def filter_identity_bound_contexts(contexts: object) -> list[dict]:
     return filtered
 
 
+def has_identity_bound_history(contexts: object) -> bool:
+    return bool(
+        isinstance(contexts, list)
+        and any(
+            isinstance(context, dict)
+            and context.get("role") == "user"
+            and CURRENT_TURN_MARKER in _context_text(context)
+            for context in contexts
+        )
+    )
+
+
 def _context_text(context: dict) -> str:
     content = context.get("content", "")
     if isinstance(content, str):
@@ -484,7 +496,7 @@ def render_group_roster(
     *,
     current_sender_id: str = "",
     current_sender_name: str = "",
-    max_members: int = 30,
+    max_members: int = 12,
 ) -> str:
     members: dict[str, tuple[float, list[str]]] = {}
     for record in records:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -13,6 +14,7 @@ from memory_core import (
     MemberRelation,
     append_record,
     filter_identity_bound_contexts,
+    has_identity_bound_history,
     filter_durable_records,
     find_nickname_relations,
     is_allowlisted_group,
@@ -55,6 +57,16 @@ class AllowlistTests(unittest.TestCase):
         self.assertFalse(is_allowlisted_group(**{**values, "is_group": False}))
         self.assertFalse(is_allowlisted_group(**{**values, "whitelist_enabled": False}))
         self.assertFalse(is_allowlisted_group(**{**values, "whitelist": []}))
+
+    def test_request_context_defaults_are_bounded(self) -> None:
+        schema = json.loads(
+            (PLUGIN_ROOT / "_conf_schema.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(schema["max_relevant_records"]["default"], 4)
+        self.assertEqual(schema["recent_records"]["default"], 3)
+        self.assertEqual(schema["max_roster_members"]["default"], 12)
+        self.assertEqual(schema["max_injected_chars"]["default"], 2500)
+        self.assertEqual(schema["long_term_injected_chars"]["default"], 900)
 
 
 class StorageTests(unittest.TestCase):
@@ -310,6 +322,8 @@ class StorageTests(unittest.TestCase):
             filter_identity_bound_contexts(contexts),
             [bound_user, bound_reply],
         )
+        self.assertFalse(has_identity_bound_history([legacy_user, legacy_reply]))
+        self.assertTrue(has_identity_bound_history([bound_user, bound_reply]))
 
     def test_keeps_tool_context_only_for_identity_bound_turns(self) -> None:
         legacy_contexts = [
