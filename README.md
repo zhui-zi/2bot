@@ -19,3 +19,7 @@ Public AstrBot plugins used by a personal QQ bot.
 Each plugin contains its own metadata, configuration schema, documentation, and tests where applicable.
 
 Runtime credentials, deployment-specific configuration, generated caches, private persona configuration, and independently maintained plugin worktrees are intentionally excluded.
+
+## License
+
+Project code is licensed under the [MIT License](LICENSE). Bundled third-party knowledge data remains subject to its source terms.
