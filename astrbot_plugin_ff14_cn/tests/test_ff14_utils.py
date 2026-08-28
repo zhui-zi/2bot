@@ -39,15 +39,15 @@ class BattlefieldTests(unittest.TestCase):
         current = datetime(2026, 4, 28, 15, 0, tzinfo=utc)
         self.assertEqual(battlefield_for_time(current), BATTLEFIELD_ROTATION[0])
 
-    def test_rotation_text_shows_2300_rotation_periods_without_short_names(self):
+    def test_rotation_text_shows_compact_rotation_start_times(self):
         text = battlefield_rotation_text(BATTLEFIELD_ANCHOR)
 
         self.assertEqual(
             text,
             "【每日战场轮换】\n"
-            "本轮（2026-04-28 23:00 至 2026-04-29 23:00）："
+            "本轮（04-28 23:00）："
             "周边遗迹群（阵地战）\n"
-            "下轮（2026-04-29 23:00 至 2026-04-30 23:00）："
+            "下轮（04-29 23:00）："
             "昂萨哈凯尔（竞争战）",
         )
         self.assertNotIn("常用简称", text)
@@ -56,11 +56,11 @@ class BattlefieldTests(unittest.TestCase):
         text = battlefield_rotation_text(BATTLEFIELD_ANCHOR - timedelta(minutes=1))
 
         self.assertIn(
-            "本轮（2026-04-27 23:00 至 2026-04-28 23:00）",
+            "本轮（04-27 23:00）",
             text,
         )
         self.assertIn(
-            "下轮（2026-04-28 23:00 至 2026-04-29 23:00）",
+            "下轮（04-28 23:00）",
             text,
         )
 
