@@ -14,9 +14,11 @@ from astrbot_plugin_ff14_cn.housing import (  # noqa: E402
     HousingCriteria,
     House,
     house_matches,
+    housing_result_reminder_due,
     lottery_cycle,
     parse_house,
     parse_housing_criteria,
+    render_housing_result_reminder,
 )
 
 
@@ -108,6 +110,25 @@ class LotteryCycleTests(unittest.TestCase):
             next_application.end_time,
             int(LOTTERY_ANCHOR.timestamp()) + CYCLE_SECONDS + APPLICATION_SECONDS,
         )
+
+    def test_result_reminder_is_due_once_per_subscribed_cycle(self):
+        subscription = {"house": True, "house_result_cycle": "previous"}
+
+        self.assertTrue(housing_result_reminder_due(subscription, "current", 2))
+        subscription["house_result_cycle"] = "current"
+        self.assertFalse(housing_result_reminder_due(subscription, "current", 2))
+        self.assertFalse(housing_result_reminder_due(subscription, "next", 1))
+        self.assertFalse(
+            housing_result_reminder_due({"house": False}, "current", 2)
+        )
+
+    def test_result_reminder_contains_confirmation_deadline(self):
+        result_end = int((LOTTERY_ANCHOR + timedelta(days=9)).timestamp())
+
+        message = render_housing_result_reminder(result_end)
+
+        self.assertIn("抽选结果已公布", message)
+        self.assertIn("结果确认期截止：2022-08-17 23:00", message)
 
 
 class HousingCriteriaTests(unittest.TestCase):

@@ -108,6 +108,7 @@ class SubscriptionTests(unittest.TestCase):
         self.assertNotIn("group_id", subscription)
         self.assertFalse(subscription["news"])
         self.assertFalse(subscription["pvp"])
+        self.assertEqual(subscription["house_result_cycle"], "")
 
     def test_existing_group_subscription_is_migrated_without_losing_state(self):
         existing = {"news": True, "news_seen": ["entry-1"]}

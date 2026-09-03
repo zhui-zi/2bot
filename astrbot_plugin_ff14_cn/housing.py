@@ -118,6 +118,27 @@ def lottery_cycle(now: datetime) -> tuple[str, int, int, int]:
     return str(start), state, start, end_time
 
 
+def housing_result_reminder_due(
+    subscription: dict[str, Any],
+    cycle_key: str,
+    state: int,
+) -> bool:
+    return (
+        bool(subscription.get("house"))
+        and state == 2
+        and subscription.get("house_result_cycle") != cycle_key
+    )
+
+
+def render_housing_result_reminder(result_end: int) -> str:
+    end = datetime.fromtimestamp(result_end, SHANGHAI_TZ)
+    return (
+        "【国服房屋抽选结果】\n"
+        "本轮抽选结果已公布，请及时登录游戏确认。\n"
+        f"结果确认期截止：{end:%Y-%m-%d %H:%M}"
+    )
+
+
 def parse_house(payload: Any, now: datetime) -> House | None:
     if not isinstance(payload, dict):
         return None

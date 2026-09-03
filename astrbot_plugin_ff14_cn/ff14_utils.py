@@ -35,6 +35,7 @@ SUBSCRIPTION_DEFAULTS = {
     "house_sizes": [0, 1, 2],
     "house_audiences": ["personal", "fc"],
     "house_server_cycles": {},
+    "house_result_cycle": "",
 }
 
 
@@ -92,6 +93,8 @@ def normalize_subscription(
         current["house_audiences"] = ["personal", "fc"]
     if not isinstance(current.get("house_server_cycles"), dict):
         current["house_server_cycles"] = {}
+    if not isinstance(current.get("house_result_cycle"), str):
+        current["house_result_cycle"] = ""
     return current
 
 

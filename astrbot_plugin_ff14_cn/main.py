@@ -35,10 +35,12 @@ from .housing import (
     criteria_from_subscription,
     criteria_text,
     house_matches,
+    housing_result_reminder_due,
     lottery_cycle,
     parse_house,
     parse_housing_criteria,
     render_housing_message,
+    render_housing_result_reminder,
 )
 
 
@@ -49,7 +51,7 @@ STATE_KEY = "state_v1"
     "ff14_cn_push",
     "keita",
     "QQ Official and SnowLuma FF14 CN notifications.",
-    "1.3.0",
+    "1.3.3",
 )
 class FF14CnPush(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -325,7 +327,7 @@ class FF14CnPush(Star):
         if error or criteria is None:
             yield event.plain_result(error)
             return
-        cycle_key, _state, _start, _end = lottery_cycle(datetime.now(SHANGHAI_TZ))
+        cycle_key, state, _start, _end = lottery_cycle(datetime.now(SHANGHAI_TZ))
         async with self._state_lock:
             subscription = self._subscription(umo, target_id, scene)
             subscription["house"] = True
@@ -335,6 +337,8 @@ class FF14CnPush(Star):
             subscription["house_server_cycles"] = {
                 str(server_id): cycle_key for server_id in criteria.server_ids
             }
+            if state == 2:
+                subscription["house_result_cycle"] = cycle_key
             await self._save_state()
         yield event.plain_result(
             "国服空闲房区推送已开启。\n"
@@ -361,7 +365,10 @@ class FF14CnPush(Star):
 
     async def _poll_housing(self, now: datetime) -> None:
         await self._ensure_state()
-        cycle_key, state, cycle_start, _end = lottery_cycle(now)
+        cycle_key, state, cycle_start, cycle_end = lottery_cycle(now)
+        if state == 2:
+            await self._push_housing_result_if_due(cycle_key, cycle_end)
+            return
         if state != 1:
             return
         async with self._state_lock:
@@ -427,6 +434,35 @@ class FF14CnPush(Star):
                     cycles = subscription.setdefault("house_server_cycles", {})
                     cycles[str(server_id)] = cycle_key
                     await self._save_state()
+
+    async def _push_housing_result_if_due(
+        self,
+        cycle_key: str,
+        result_end: int,
+    ) -> None:
+        async with self._state_lock:
+            targets = [
+                (umo, subscription)
+                for umo, subscription in self._state.get("subscriptions", {}).items()
+                if housing_result_reminder_due(subscription, cycle_key, 2)
+            ]
+        for umo, subscription in targets:
+            try:
+                await self._send(
+                    umo,
+                    render_housing_result_reminder(result_end),
+                    normalize_scene(subscription.get("scene")),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Unable to send housing result reminder to %s: %s",
+                    umo,
+                    exc,
+                )
+                continue
+            async with self._state_lock:
+                subscription["house_result_cycle"] = cycle_key
+                await self._save_state()
 
     async def _fetch_houses(
         self,
