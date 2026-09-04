@@ -79,7 +79,8 @@ class TarotDeckTests(unittest.TestCase):
 
     def test_main_routes_tarot_to_flash_without_default_request(self):
         source = (PLUGIN_ROOT / "main.py").read_text(encoding="utf-8")
-        self.assertIn("chat_provider_id=self._provider_id()", source)
+        self.assertIn("for provider_id in self._provider_ids()", source)
+        self.assertIn('DEFAULT_FLASH_FALLBACK_PROVIDER_ID = "deepseek_v4_flash_official"', source)
         self.assertNotIn("event.request_llm", source)
 
 

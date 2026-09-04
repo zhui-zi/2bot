@@ -47,13 +47,14 @@ from .front_core import (
 
 
 DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
+DEFAULT_FLASH_FALLBACK_PROVIDER_ID = "deepseek_v4_flash_official"
 
 
 @register(
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.4.3",
+    "1.4.4",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -219,30 +220,20 @@ class UnifiedFrontGuard(Star):
 
     async def _generate_security_reply(self, kind: str, message: str) -> str:
         fallback = SECURITY_REPLY_FALLBACKS[kind]
-        try:
-            response = await asyncio.wait_for(
-                self.context.llm_generate(
-                    chat_provider_id=self._provider_id(),
-                    prompt=build_security_reply_prompt(kind, message),
-                    system_prompt=SECURITY_REPLY_SYSTEM_PROMPT,
-                    contexts=[],
-                    temperature=self._security_reply_temperature(),
-                    max_tokens=self._security_reply_max_tokens(),
-                    thinking={"type": "disabled"},
-                ),
-                timeout=self._security_reply_timeout(),
-            )
+        async for response in self._flash_responses(
+            timeout=self._security_reply_timeout(),
+            prompt=build_security_reply_prompt(kind, message),
+            system_prompt=SECURITY_REPLY_SYSTEM_PROMPT,
+            contexts=[],
+            temperature=self._security_reply_temperature(),
+            max_tokens=self._security_reply_max_tokens(),
+            thinking={"type": "disabled"},
+        ):
             reply = clean_security_reply(response.completion_text or "")
             if reply:
                 logger.info("Front Flash generated security reply kind=%s.", kind)
                 return reply
             logger.warning("Front Flash returned an empty security reply kind=%s.", kind)
-        except Exception as exc:
-            logger.warning(
-                "Front Flash security reply failed kind=%s error=%s.",
-                kind,
-                type(exc).__name__,
-            )
         return fallback
 
     async def _classify(self, message: str) -> FrontClassification | None:
@@ -254,26 +245,22 @@ class UnifiedFrontGuard(Star):
                 self._classification_cache.move_to_end(cache_key)
                 return cached[1]
 
-        try:
-            response = await asyncio.wait_for(
-                self.context.llm_generate(
-                    chat_provider_id=self._provider_id(),
-                    prompt=build_classifier_prompt(message),
-                    system_prompt=CLASSIFIER_SYSTEM_PROMPT,
-                    contexts=[],
-                    temperature=0,
-                    max_tokens=180,
-                    thinking={"type": "disabled"},
-                    response_format={"type": "json_object"},
-                ),
-                timeout=self._classifier_timeout(),
-            )
+        classification = None
+        async for response in self._flash_responses(
+            timeout=self._classifier_timeout(),
+            prompt=build_classifier_prompt(message),
+            system_prompt=CLASSIFIER_SYSTEM_PROMPT,
+            contexts=[],
+            temperature=0,
+            max_tokens=180,
+            thinking={"type": "disabled"},
+            response_format={"type": "json_object"},
+        ):
             classification = parse_classifier_output(response.completion_text or "")
-        except Exception as exc:
-            logger.warning("Front Flash classification failed: %s", type(exc).__name__)
-            return None
-        if classification is None:
+            if classification is not None:
+                break
             logger.warning("Front Flash classifier returned invalid output.")
+        if classification is None:
             return None
 
         async with self._cache_lock:
@@ -410,6 +397,39 @@ class UnifiedFrontGuard(Star):
             self.config.get("flash_provider_id", DEFAULT_FLASH_PROVIDER_ID)
             or DEFAULT_FLASH_PROVIDER_ID
         ).strip()
+
+    def _provider_ids(self) -> tuple[str, ...]:
+        primary = self._provider_id()
+        fallback = str(
+            self.config.get(
+                "flash_fallback_provider_id",
+                DEFAULT_FLASH_FALLBACK_PROVIDER_ID,
+            )
+            or ""
+        ).strip()
+        return (primary, fallback) if fallback and fallback != primary else (primary,)
+
+    async def _flash_responses(
+        self,
+        *,
+        timeout: float,
+        **kwargs: Any,
+    ) -> AsyncGenerator[Any, None]:
+        for provider_id in self._provider_ids():
+            try:
+                yield await asyncio.wait_for(
+                    self.context.llm_generate(
+                        chat_provider_id=provider_id,
+                        **kwargs,
+                    ),
+                    timeout=timeout,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Front Flash request failed provider=%s error=%s.",
+                    provider_id,
+                    type(exc).__name__,
+                )
 
     def _classifier_enabled(self) -> bool:
         return bool(self.config.get("classifier_enabled", True))

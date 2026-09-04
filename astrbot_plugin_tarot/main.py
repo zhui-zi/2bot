@@ -25,13 +25,14 @@ from .tarot_core import (
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
+DEFAULT_FLASH_FALLBACK_PROVIDER_ID = "deepseek_v4_flash_official"
 
 
 @register(
     "tarot_reading",
     "keita",
     "Three-card Major Arcana readings for reflection and entertainment.",
-    "1.4.0",
+    "1.4.1",
 )
 class TarotReading(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -67,21 +68,32 @@ class TarotReading(Star):
             cards = draw_daily_fortune(sender_key, today)
             prompt = build_daily_fortune_prompt(today, cards)
             header = format_daily_fortune(today, cards)
-        try:
-            response = await asyncio.wait_for(
-                self.context.llm_generate(
-                    chat_provider_id=self._provider_id(),
-                    prompt=prompt,
-                    system_prompt=TAROT_SYSTEM_PROMPT,
-                    contexts=[],
-                    temperature=0.7,
-                    max_tokens=self._max_tokens(),
-                    thinking={"type": "disabled"},
-                ),
-                timeout=self._timeout_seconds(),
-            )
-        except Exception as exc:
-            logger.warning("Tarot Flash reading failed: %s", type(exc).__name__)
+        response = None
+        for provider_id in self._provider_ids():
+            try:
+                candidate = await asyncio.wait_for(
+                    self.context.llm_generate(
+                        chat_provider_id=provider_id,
+                        prompt=prompt,
+                        system_prompt=TAROT_SYSTEM_PROMPT,
+                        contexts=[],
+                        temperature=0.7,
+                        max_tokens=self._max_tokens(),
+                        thinking={"type": "disabled"},
+                    ),
+                    timeout=self._timeout_seconds(),
+                )
+                if candidate.completion_text:
+                    response = candidate
+                    break
+                logger.warning("Tarot Flash returned empty output provider=%s.", provider_id)
+            except Exception as exc:
+                logger.warning(
+                    "Tarot Flash reading failed provider=%s error=%s.",
+                    provider_id,
+                    type(exc).__name__,
+                )
+        if response is None:
             yield event.plain_result("牌面已经抽好，但解读模型暂时不可用，请稍后再试。")
             return
         yield event.plain_result(
@@ -93,6 +105,17 @@ class TarotReading(Star):
             self.config.get("flash_provider_id", DEFAULT_FLASH_PROVIDER_ID)
             or DEFAULT_FLASH_PROVIDER_ID
         ).strip()
+
+    def _provider_ids(self) -> tuple[str, ...]:
+        primary = self._provider_id()
+        fallback = str(
+            self.config.get(
+                "flash_fallback_provider_id",
+                DEFAULT_FLASH_FALLBACK_PROVIDER_ID,
+            )
+            or ""
+        ).strip()
+        return (primary, fallback) if fallback and fallback != primary else (primary,)
 
     def _timeout_seconds(self) -> float:
         try:

@@ -1,7 +1,7 @@
 name: unified_front_guard
 display_name: Unified Front Guard
 desc: Routes user features and protects model requests through a Flash front layer.
-version: v1.4.3
+version: v1.4.4
 author: keita
 repo: https://github.com/zhui-zi/2bot
 support_platforms:

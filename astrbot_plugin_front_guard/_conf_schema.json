@@ -19,6 +19,11 @@
     "type": "string",
     "default": "deepseek_v4_flash"
   },
+  "flash_fallback_provider_id": {
+    "description": "AstrBot provider ID used when the primary Flash provider fails.",
+    "type": "string",
+    "default": "deepseek_v4_flash_official"
+  },
   "classifier_timeout_seconds": {
     "description": "Maximum time allowed for a Flash classification request.",
     "type": "float",

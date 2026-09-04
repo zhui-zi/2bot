@@ -19,6 +19,11 @@
     "type": "string",
     "default": "deepseek_v4_flash"
   },
+  "adult_classifier_fallback_provider_id": {
+    "description": "AstrBot provider ID used when the primary adult classifier fails.",
+    "type": "string",
+    "default": "deepseek_v4_flash_official"
+  },
   "adult_classifier_timeout_seconds": {
     "description": "Maximum time allowed for one adult-intent classification.",
     "type": "float",

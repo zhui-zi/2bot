@@ -46,13 +46,14 @@ from .nsfw_core import (
 
 
 DEFAULT_CLASSIFIER_PROVIDER_ID = "deepseek_v4_flash"
+DEFAULT_CLASSIFIER_FALLBACK_PROVIDER_ID = "deepseek_v4_flash_official"
 
 
 @register(
     "group_nsfw_unlock",
     "keita",
     "Adds author-controlled, group-scoped adult-content prompting.",
-    "1.3.0",
+    "1.3.1",
 )
 class GroupNsfwUnlock(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -235,31 +236,38 @@ class GroupNsfwUnlock(Star):
             if cached and now - cached[0] <= self._classifier_cache_ttl():
                 self._classification_cache.move_to_end(cache_key)
                 return cached[1]
-        try:
-            response = await asyncio.wait_for(
-                self.context.llm_generate(
-                    chat_provider_id=self._classifier_provider_id(),
-                    prompt=build_adult_classifier_prompt(message),
-                    system_prompt=ADULT_CLASSIFIER_SYSTEM_PROMPT,
-                    contexts=[],
-                    temperature=0,
-                    max_tokens=64,
-                    thinking={"type": "disabled"},
-                    response_format={"type": "json_object"},
-                ),
-                timeout=self._classifier_timeout(),
-            )
-            classification = parse_adult_classifier_output(
-                response.completion_text or ""
-            )
-        except Exception as exc:
-            logger.warning(
-                "Group NSFW classification failed error=%s.",
-                type(exc).__name__,
-            )
-            return False
+        classification = None
+        for provider_id in self._classifier_provider_ids():
+            try:
+                response = await asyncio.wait_for(
+                    self.context.llm_generate(
+                        chat_provider_id=provider_id,
+                        prompt=build_adult_classifier_prompt(message),
+                        system_prompt=ADULT_CLASSIFIER_SYSTEM_PROMPT,
+                        contexts=[],
+                        temperature=0,
+                        max_tokens=64,
+                        thinking={"type": "disabled"},
+                        response_format={"type": "json_object"},
+                    ),
+                    timeout=self._classifier_timeout(),
+                )
+                classification = parse_adult_classifier_output(
+                    response.completion_text or ""
+                )
+                if classification is not None:
+                    break
+                logger.warning(
+                    "Group NSFW classifier returned invalid output provider=%s.",
+                    provider_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Group NSFW classification failed provider=%s error=%s.",
+                    provider_id,
+                    type(exc).__name__,
+                )
         if classification is None:
-            logger.warning("Group NSFW classifier returned invalid output.")
             return False
         matched = bool(
             classification.adult
@@ -286,6 +294,17 @@ class GroupNsfwUnlock(Star):
             )
             or DEFAULT_CLASSIFIER_PROVIDER_ID
         ).strip()
+
+    def _classifier_provider_ids(self) -> tuple[str, ...]:
+        primary = self._classifier_provider_id()
+        fallback = str(
+            self.config.get(
+                "adult_classifier_fallback_provider_id",
+                DEFAULT_CLASSIFIER_FALLBACK_PROVIDER_ID,
+            )
+            or ""
+        ).strip()
+        return (primary, fallback) if fallback and fallback != primary else (primary,)
 
     def _classifier_timeout(self) -> float:
         return self._bounded_float(

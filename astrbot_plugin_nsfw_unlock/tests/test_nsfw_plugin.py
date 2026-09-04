@@ -116,7 +116,10 @@ class _FakeContext:
         self.calls.append(kwargs)
         if not self.responses:
             raise RuntimeError("missing fake response")
-        return types.SimpleNamespace(completion_text=self.responses.pop(0))
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return types.SimpleNamespace(completion_text=response)
 
 
 class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
@@ -312,6 +315,26 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.mark_adult_turn(repeated)
         self.assertEqual(repeated.get_extra("_nsfw_mode_active"), "adult_content")
         self.assertEqual(len(self.context.calls), 1)
+
+    async def test_flash_classifier_falls_back_to_official_provider(self) -> None:
+        author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")
+        await self._results(self.plugin.manage_nsfw(author, "on"))
+        self.context.responses.extend(
+            [RuntimeError("primary unavailable"), '{"adult": true, "confidence": 0.93}']
+        )
+
+        event = _FakeEvent(
+            sender_id="member",
+            group_id="group-a",
+            message="这是一个只有分类器能识别的新隐晦说法",
+        )
+        await self.plugin.mark_adult_turn(event)
+
+        self.assertEqual(event.get_extra("_nsfw_mode_active"), "adult_content")
+        self.assertEqual(
+            [call["chat_provider_id"] for call in self.context.calls],
+            ["deepseek_v4_flash", "deepseek_v4_flash_official"],
+        )
 
     async def test_flash_rejects_ordinary_and_skips_undirected_group_traffic(self) -> None:
         author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")
