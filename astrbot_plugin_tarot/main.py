@@ -70,6 +70,11 @@ class TarotReading(Star):
             header = format_daily_fortune(today, cards)
         response = None
         for provider_id in self._provider_ids():
+            reasoning_options = (
+                {"reasoning_effort": "none"}
+                if provider_id == DEFAULT_FLASH_PROVIDER_ID
+                else {"thinking": {"type": "disabled"}}
+            )
             try:
                 candidate = await asyncio.wait_for(
                     self.context.llm_generate(
@@ -79,7 +84,7 @@ class TarotReading(Star):
                         contexts=[],
                         temperature=0.7,
                         max_tokens=self._max_tokens(),
-                        thinking={"type": "disabled"},
+                        **reasoning_options,
                     ),
                     timeout=self._timeout_seconds(),
                 )

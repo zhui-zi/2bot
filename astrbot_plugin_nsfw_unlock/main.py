@@ -238,6 +238,11 @@ class GroupNsfwUnlock(Star):
                 return cached[1]
         classification = None
         for provider_id in self._classifier_provider_ids():
+            reasoning_options = (
+                {"reasoning_effort": "none"}
+                if provider_id == DEFAULT_CLASSIFIER_PROVIDER_ID
+                else {"thinking": {"type": "disabled"}}
+            )
             try:
                 response = await asyncio.wait_for(
                     self.context.llm_generate(
@@ -247,7 +252,7 @@ class GroupNsfwUnlock(Star):
                         contexts=[],
                         temperature=0,
                         max_tokens=64,
-                        thinking={"type": "disabled"},
+                        **reasoning_options,
                         response_format={"type": "json_object"},
                     ),
                     timeout=self._classifier_timeout(),

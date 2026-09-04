@@ -335,6 +335,12 @@ class GroupNsfwPluginTests(unittest.IsolatedAsyncioTestCase):
             [call["chat_provider_id"] for call in self.context.calls],
             ["deepseek_v4_flash", "deepseek_v4_flash_official"],
         )
+        self.assertEqual(self.context.calls[0]["reasoning_effort"], "none")
+        self.assertNotIn("thinking", self.context.calls[0])
+        self.assertEqual(
+            self.context.calls[1]["thinking"],
+            {"type": "disabled"},
+        )
 
     async def test_flash_rejects_ordinary_and_skips_undirected_group_traffic(self) -> None:
         author = _FakeEvent(sender_id="author", group_id="group-a", message="/nsfw on")

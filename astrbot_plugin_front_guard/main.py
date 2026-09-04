@@ -416,11 +416,15 @@ class UnifiedFrontGuard(Star):
         **kwargs: Any,
     ) -> AsyncGenerator[Any, None]:
         for provider_id in self._provider_ids():
+            request_kwargs = dict(kwargs)
+            if provider_id == DEFAULT_FLASH_PROVIDER_ID:
+                request_kwargs.pop("thinking", None)
+                request_kwargs["reasoning_effort"] = "none"
             try:
                 yield await asyncio.wait_for(
                     self.context.llm_generate(
                         chat_provider_id=provider_id,
-                        **kwargs,
+                        **request_kwargs,
                     ),
                     timeout=timeout,
                 )
