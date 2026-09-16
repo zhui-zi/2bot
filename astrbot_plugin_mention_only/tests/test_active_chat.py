@@ -4,7 +4,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_DIR))
 
@@ -113,14 +112,17 @@ class LLMGateTests(unittest.TestCase):
             )
         )
 
-    def test_keeps_unrelated_official_private_chat_blocked(self) -> None:
-        self.assertFalse(
+    def test_allows_official_private_chat_without_group_mention(self) -> None:
+        self.assertTrue(
             self.allow(
                 is_private_chat=True,
                 targets_bot=False,
                 allow_reason="",
             )
         )
+
+    def test_normalizes_official_platform_before_applying_group_gate(self) -> None:
+        self.assertFalse(self.allow(platform_name=" QQ_OFFICIAL ", targets_bot=False))
 
     def test_preserves_group_mention_and_other_platform_behavior(self) -> None:
         self.assertTrue(self.allow())

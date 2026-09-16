@@ -1,9 +1,9 @@
+import json
 import sys
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_ROOT))
@@ -66,6 +66,55 @@ class BattlefieldTests(unittest.TestCase):
 
 
 class FeedTests(unittest.TestCase):
+    def test_official_news_uses_article_link_and_local_publish_time(self):
+        items = parse_feed(
+            json.dumps(
+                {
+                    "Code": "0",
+                    "Data": [
+                        {
+                            "Id": 393156,
+                            "Title": "Maintenance",
+                            "Author": "555",
+                            "OutLink": "",
+                            "PublishDate": "2026/09/16 14:26:53",
+                            "Summary": "<p>Scheduled maintenance.</p>",
+                        }
+                    ],
+                }
+            )
+        )
+        self.assertEqual(
+            items[0].link,
+            "https://ff.web.sdo.com/web8/index.html#/newstab/newscont/393156",
+        )
+        self.assertEqual(items[0].item_id, items[0].link)
+        self.assertEqual(items[0].published, "2026-09-16 14:26")
+        self.assertEqual(items[0].summary, "Scheduled maintenance.")
+
+    def test_official_news_preserves_valid_external_link(self):
+        items = parse_feed(
+            json.dumps(
+                {
+                    "Code": 0,
+                    "Data": [
+                        {
+                            "Id": 1,
+                            "Title": "Event",
+                            "OutLink": "https://example.com/event",
+                            "PublishDate": "2026/09/16 14:26:53",
+                        }
+                    ],
+                }
+            )
+        )
+        self.assertEqual(items[0].link, "https://example.com/event")
+
+    def test_official_news_failure_is_not_an_empty_success(self):
+        for payload in [{"Code": "1", "Data": []}, {"Code": "0", "Data": {}}]:
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                parse_feed(json.dumps(payload))
+
     def test_rss_feed(self):
         items = parse_feed(
             """<?xml version="1.0"?>

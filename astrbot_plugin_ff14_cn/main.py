@@ -10,6 +10,7 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.command import GreedyStr
+
 try:
     from data.plugins.astrbot_plugin_permissions.permission_core import (
         PERMISSION_GROUP_MANAGER,
@@ -22,8 +23,9 @@ except ImportError:
     )
 
 from .ff14_utils import (
-    FeedItem,
+    DEFAULT_NEWS_URL,
     SHANGHAI_TZ,
+    FeedItem,
     battlefield_rotation_text,
     normalize_scene,
     normalize_subscription,
@@ -43,7 +45,6 @@ from .housing import (
     render_housing_result_reminder,
 )
 
-
 STATE_KEY = "state_v1"
 
 
@@ -51,7 +52,7 @@ STATE_KEY = "state_v1"
     "ff14_cn_push",
     "keita",
     "QQ Official and SnowLuma FF14 CN notifications.",
-    "1.3.3",
+    "1.3.4",
 )
 class FF14CnPush(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -66,8 +67,7 @@ class FF14CnPush(Star):
             timeout=float(config.get("request_timeout_seconds", 20)),
             headers={
                 "User-Agent": (
-                    "AstrBot-FF14-CN-Push/1.2 "
-                    "(https://github.com/zhui-zi/2bot)"
+                    "AstrBot-FF14-CN-Push/1.2 (https://github.com/zhui-zi/2bot)"
                 )
             },
         )
@@ -186,7 +186,9 @@ class FF14CnPush(Star):
             if self._ready.is_set():
                 return
             loaded = await self.get_kv_data(STATE_KEY, {"subscriptions": {}})
-            if isinstance(loaded, dict) and isinstance(loaded.get("subscriptions"), dict):
+            if isinstance(loaded, dict) and isinstance(
+                loaded.get("subscriptions"), dict
+            ):
                 self._state = loaded
             self._ready.set()
 
@@ -266,7 +268,7 @@ class FF14CnPush(Star):
                 await self._save_state()
 
     async def _fetch_news(self) -> list[FeedItem]:
-        url = str(self.config.get("rss_url", "http://rsshub:1200/ff14/zh/all"))
+        url = str(self.config.get("rss_url", DEFAULT_NEWS_URL))
         response = await self._client.get(url)
         response.raise_for_status()
         return parse_feed(response.text)
@@ -356,7 +358,9 @@ class FF14CnPush(Star):
             try:
                 houses, _updated_at = await self._fetch_houses(server_id, now)
             except Exception as exc:
-                logger.warning("Unable to fetch housing data for %s: %s", server_id, exc)
+                logger.warning(
+                    "Unable to fetch housing data for %s: %s", server_id, exc
+                )
                 yield event.plain_result(f"服务器 {server_id} 的房屋数据暂时获取失败。")
                 continue
             yield event.plain_result(
@@ -391,7 +395,11 @@ class FF14CnPush(Star):
             return
 
         server_ids = sorted(
-            {server_id for _umo, _sub, _criteria, pending in targets for server_id in pending}
+            {
+                server_id
+                for _umo, _sub, _criteria, pending in targets
+                for server_id in pending
+            }
         )
         fetched: dict[int, list[Any]] = {}
         for server_id in server_ids:
@@ -405,7 +413,9 @@ class FF14CnPush(Star):
                     continue
                 fetched[server_id] = houses
             except Exception as exc:
-                logger.warning("Unable to fetch housing data for %s: %s", server_id, exc)
+                logger.warning(
+                    "Unable to fetch housing data for %s: %s", server_id, exc
+                )
 
         for umo, subscription, criteria, pending in targets:
             for server_id in pending:
@@ -494,7 +504,9 @@ class FF14CnPush(Star):
         try:
             updated_at = int(update_payload.get("Time", 0))
         except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("housing update API returned an invalid timestamp") from exc
+            raise ValueError(
+                "housing update API returned an invalid timestamp"
+            ) from exc
         return (
             [
                 house
@@ -555,7 +567,9 @@ class FF14CnPush(Star):
                     normalize_scene(subscription.get("scene")),
                 )
             except Exception as exc:
-                logger.warning("Unable to send battlefield rotation to %s: %s", umo, exc)
+                logger.warning(
+                    "Unable to send battlefield rotation to %s: %s", umo, exc
+                )
                 continue
             async with self._state_lock:
                 subscription["battlefield_last_date"] = date_key
@@ -573,7 +587,9 @@ class FF14CnPush(Star):
         housing = "关闭"
         if subscription.get("house"):
             criteria = criteria_from_subscription(subscription)
-            housing = "开启" + (f"\n  {criteria_text(criteria)}" if criteria else "（配置无效）")
+            housing = "开启" + (
+                f"\n  {criteria_text(criteria)}" if criteria else "（配置无效）"
+            )
         scope = "当前私聊" if self._event_scene(event) == "friend" else "当前群聊"
         return (
             f"{scope}订阅\nFF14 国服新闻：{news}\n"
@@ -632,10 +648,7 @@ class FF14CnPush(Star):
         raw = FF14CnPush._raw_data(event)
         return bool(
             (isinstance(raw, dict) and raw.get("group_openid"))
-            or (
-                raw_message
-                and "groupmessage" in type(raw_message).__name__.lower()
-            )
+            or (raw_message and "groupmessage" in type(raw_message).__name__.lower())
         )
 
     @staticmethod

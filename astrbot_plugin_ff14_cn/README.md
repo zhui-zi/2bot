@@ -4,7 +4,7 @@ AstrBot plugin for QQ Official and SnowLuma FF14 CN notifications.
 
 ## Features
 
-- Polls the RSSHub `/ff14/zh/all` route and sends unseen entries.
+- Polls the official FF14 CN news API and sends unseen entries. Custom RSS and Atom sources are also supported.
 - Sends the current and next-day CN Frontline maps every day at 23:00 Asia/Shanghai.
 - Polls the public CN housing API and sends one deduplicated update when each five-day lottery application period starts.
 - Filters housing subscriptions by server, S/M/L size, and personal, free-company, or shared eligibility.
@@ -12,7 +12,7 @@ AstrBot plugin for QQ Official and SnowLuma FF14 CN notifications.
 - Uses the shared permission service for bot authors, AstrBot administrators, and current-group owner/admin roles.
 - Restricts group switch changes to the shared group-manager tier or higher.
 - Allows each private user to manage only their own private subscription.
-- Seeds current RSS entries when enabled to avoid sending historical news.
+- Seeds current news entries when enabled to avoid sending historical news.
 
 ## Commands
 

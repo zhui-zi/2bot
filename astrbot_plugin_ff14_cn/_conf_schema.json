@@ -1,8 +1,8 @@
 {
   "rss_url": {
-    "description": "RSSHub FF14 CN aggregate feed URL.",
+    "description": "FF14 CN news source URL: official JSON API, RSS, or Atom.",
     "type": "string",
-    "default": "http://rsshub:1200/ff14/zh/all"
+    "default": "https://cqnews.web.sdo.com/api/news/newsList?gameCode=ff&CategoryCode=5309,5310,5312,8324,8325,8326,8327,5311,5313&pageIndex=0&pageSize=50"
   },
   "news_poll_seconds": {
     "description": "News feed polling interval in seconds.",

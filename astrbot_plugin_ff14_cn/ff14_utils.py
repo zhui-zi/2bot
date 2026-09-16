@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -10,8 +11,12 @@ from typing import Any
 from xml.etree import ElementTree
 from zoneinfo import ZoneInfo
 
-
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+DEFAULT_NEWS_URL = (
+    "https://cqnews.web.sdo.com/api/news/newsList?gameCode=ff&"
+    "CategoryCode=5309,5310,5312,8324,8325,8326,8327,5311,5313&"
+    "pageIndex=0&pageSize=50"
+)
 BATTLEFIELD_ANCHOR = datetime(2026, 4, 28, 23, 0, tzinfo=SHANGHAI_TZ)
 BATTLEFIELD_ROTATION = (
     ("阵地", "周边遗迹群（阵地战）"),
@@ -131,6 +136,41 @@ def strip_markup(value: str | None, limit: int = 240) -> str:
 
 
 def parse_feed(xml_text: str) -> list[FeedItem]:
+    if xml_text.lstrip().startswith("{"):
+        payload = json.loads(xml_text)
+        if str(payload.get("Code")) != "0" or not isinstance(payload.get("Data"), list):
+            raise ValueError("official news API returned an invalid response")
+        items: list[FeedItem] = []
+        for entry in payload["Data"]:
+            if (
+                not isinstance(entry, dict)
+                or not entry.get("Id")
+                or not entry.get("Title")
+            ):
+                continue
+            link = str(entry.get("OutLink") or "").strip()
+            if not link.startswith(("https://", "http://")):
+                link = (
+                    "https://ff.web.sdo.com/web8/index.html#/newstab/newscont/"
+                    f"{entry['Id']}"
+                )
+            published = (
+                datetime.strptime(
+                    str(entry.get("PublishDate") or ""), "%Y/%m/%d %H:%M:%S"
+                )
+                .replace(tzinfo=SHANGHAI_TZ)
+                .strftime("%Y-%m-%d %H:%M")
+            )
+            items.append(
+                _feed_item(
+                    link,
+                    str(entry["Title"]),
+                    link,
+                    published,
+                    strip_markup(str(entry.get("Summary") or "")),
+                )
+            )
+        return items
     root = ElementTree.fromstring(xml_text)
     if _local_name(root.tag) == "feed":
         return _parse_atom(root)
@@ -183,10 +223,10 @@ def _feed_item(
 ) -> FeedItem:
     stable_id = item_id or link
     if not stable_id:
-        stable_id = hashlib.sha256(
-            f"{title}\n{published}".encode("utf-8")
-        ).hexdigest()
-    return FeedItem(stable_id, strip_markup(title, 160), link.strip(), published, summary)
+        stable_id = hashlib.sha256(f"{title}\n{published}".encode("utf-8")).hexdigest()
+    return FeedItem(
+        stable_id, strip_markup(title, 160), link.strip(), published, summary
+    )
 
 
 def _child_text(node: ElementTree.Element, name: str) -> str:

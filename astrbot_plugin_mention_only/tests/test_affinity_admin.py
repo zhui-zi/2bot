@@ -6,7 +6,6 @@ import types
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -119,9 +118,7 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
             "astrbot.core.message",
             "astrbot.core.message.message_event_result",
         )
-        cls._original_modules = {
-            name: sys.modules.get(name) for name in module_names
-        }
+        cls._original_modules = {name: sys.modules.get(name) for name in module_names}
         astrbot = types.ModuleType("astrbot")
         api = types.ModuleType("astrbot.api")
         api.AstrBotConfig = dict
@@ -142,9 +139,7 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
         star.register = lambda *_args, **_kwargs: lambda value: value
         core = types.ModuleType("astrbot.core")
         message = types.ModuleType("astrbot.core.message")
-        event_result = types.ModuleType(
-            "astrbot.core.message.message_event_result"
-        )
+        event_result = types.ModuleType("astrbot.core.message.message_event_result")
         event_result.MessageChain = list
         sys.modules.update(
             {
@@ -160,16 +155,12 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         sys.modules.pop("astrbot_plugin_mention_only.main", None)
-        cls.plugin_module = importlib.import_module(
-            "astrbot_plugin_mention_only.main"
-        )
+        cls.plugin_module = importlib.import_module("astrbot_plugin_mention_only.main")
         from astrbot_plugin_permissions.permission_core import (
             configure_permission_policy,
         )
 
-        cls.configure_permission_policy = staticmethod(
-            configure_permission_policy
-        )
+        cls.configure_permission_policy = staticmethod(configure_permission_policy)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -203,9 +194,7 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
     async def test_verified_author_can_set_mentioned_target_score(self) -> None:
         event = _FakeEvent(sender_id="author")
         event._messages.append(_FakeAt("target"))
-        results = await self._results(
-            self.plugin.affinity_admin(event, "设置", "55")
-        )
+        results = await self._results(self.plugin.affinity_admin(event, "设置", "55"))
         self.assertIn("55.0/100", results[0])
         state = await self.plugin._load_affinity_state("aiocqhttp", "target")
         self.assertEqual(state.score, 55.0)
@@ -241,6 +230,26 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("用法", results[0])
         state = await self.plugin._load_affinity_state("aiocqhttp", "target")
         self.assertEqual(state.score, 0)
+
+    async def test_official_adapter_bot_marker_is_a_direct_trigger(self) -> None:
+        event = _FakeEvent(sender_id="member")
+        event.get_platform_name = lambda: "qq_official"
+        event.get_self_id = lambda: "unknown_selfid"
+        event._messages = [_FakeAt("qq_official")]
+        self.assertTrue(self.plugin._targets_bot(event))
+        event._messages = [_FakeAt("another-member")]
+        self.assertFalse(self.plugin._targets_bot(event))
+
+    async def test_official_marker_does_not_trigger_other_platforms(self) -> None:
+        event = _FakeEvent(sender_id="member")
+        event._messages = [_FakeAt("qq_official")]
+        self.assertFalse(self.plugin._targets_bot(event))
+
+    async def test_empty_reply_sender_does_not_target_unknown_bot(self) -> None:
+        event = _FakeEvent(sender_id="member")
+        event.get_self_id = lambda: ""
+        event._messages = [_FakeReply("")]
+        self.assertFalse(self.plugin._targets_bot(event))
 
 
 if __name__ == "__main__":

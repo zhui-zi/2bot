@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-
 SUPPORTED_PLATFORMS = frozenset({"qq_official", "aiocqhttp"})
-TRUSTED_LLM_ALLOW_REASONS = frozenset(
-    {"tarot_reading", "active_reply", "ff14_novice"}
-)
+TRUSTED_LLM_ALLOW_REASONS = frozenset({"tarot_reading", "active_reply", "ff14_novice"})
 MAX_ACTIVE_REPLY_PERCENT = 30.0
 DEFAULT_ACTIVE_REPLY_COOLDOWN_MINUTES = 30.0
 MAX_ACTIVE_REPLY_COOLDOWN_MINUTES = 1440.0
@@ -84,8 +81,8 @@ def should_allow_llm_request(
     targets_bot: bool,
     allow_reason: str,
 ) -> bool:
-    if platform_name != "qq_official":
+    if platform_name.strip().casefold() != "qq_official":
         return True
     if allow_reason in TRUSTED_LLM_ALLOW_REASONS:
         return True
-    return not is_private_chat and targets_bot
+    return is_private_chat or targets_bot

@@ -13,6 +13,7 @@ from astrbot.api.message_components import At, Plain, Reply
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.message_event_result import MessageChain
+
 try:
     from data.plugins.astrbot_plugin_permissions.permission_core import (
         PERMISSION_BOT_AUTHOR,
@@ -38,11 +39,11 @@ from .affinity import (
     advance_affinity,
     affinity_state_key,
     append_relationship_guidance,
-    parse_affinity_state,
     parse_affinity_score,
+    parse_affinity_state,
     private_state_probe_kind,
-    resolve_management_target,
     relationship_stage,
+    resolve_management_target,
     set_affinity_score,
 )
 from .chat_style import (
@@ -57,7 +58,7 @@ from .chat_style import (
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.15.1",
+    "1.15.2",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -112,7 +113,9 @@ class MentionOnlyChat(Star):
 
         provider = self.context.get_using_provider(event.unified_msg_origin)
         if not provider:
-            logger.warning("Active group reply skipped because no LLM provider is available.")
+            logger.warning(
+                "Active group reply skipped because no LLM provider is available."
+            )
             return
 
         conversation_manager = self.context.conversation_manager
@@ -129,7 +132,9 @@ class MentionOnlyChat(Star):
             conversation_id,
         )
         if not conversation:
-            logger.warning("Active group reply skipped because no conversation is available.")
+            logger.warning(
+                "Active group reply skipped because no conversation is available."
+            )
             return
 
         cooldown_minutes = self.config.get("active_reply_cooldown_minutes", 30)
@@ -172,9 +177,7 @@ class MentionOnlyChat(Star):
 
         platform_name = event.get_platform_name()
         adult_mode = event.get_extra("_nsfw_mode_active") == "adult_content"
-        is_bot_author = (
-            resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
-        )
+        is_bot_author = resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
 
         if should_apply_natural_style(
             platform_name,
@@ -182,9 +185,7 @@ class MentionOnlyChat(Star):
         ):
             state = await self._relationship_state(event, adult_mode=adult_mode)
             if state is not None:
-                romance_enabled = bool(
-                    self.config.get("hidden_romance_enabled", True)
-                )
+                romance_enabled = bool(self.config.get("hidden_romance_enabled", True))
                 stage = relationship_stage(
                     state,
                     romance_enabled=romance_enabled,
@@ -311,9 +312,7 @@ class MentionOnlyChat(Star):
             )
             stage = relationship_stage(
                 state,
-                romance_enabled=bool(
-                    self.config.get("hidden_romance_enabled", True)
-                ),
+                romance_enabled=bool(self.config.get("hidden_romance_enabled", True)),
             )
             stage_name = self._relationship_stage_name(stage)
             yield event.plain_result(
@@ -494,14 +493,15 @@ class MentionOnlyChat(Star):
 
     @staticmethod
     def _targets_bot(event: AstrMessageEvent) -> bool:
-        self_id = str(event.get_self_id())
+        self_id = str(event.get_self_id() or "")
+        bot_ids = {self_id} if self_id else set()
+        if str(event.get_platform_name() or "").strip().casefold() == "qq_official":
+            bot_ids.add("qq_official")
         return any(
-            (
-                isinstance(component, At)
-                and str(component.qq) == self_id
-            )
+            (isinstance(component, At) and str(component.qq) in bot_ids)
             or (
                 isinstance(component, Reply)
+                and bool(self_id)
                 and str(component.sender_id) == self_id
             )
             for component in event.get_messages()
