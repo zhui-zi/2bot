@@ -42,7 +42,7 @@ class ReplyPercentTests(unittest.TestCase):
         self.assertTrue(active_reply_cooldown_elapsed(100, 1900, 30))
         self.assertTrue(active_reply_cooldown_elapsed(200, 100, 30))
 
-    def test_quotes_only_snowluma_group_messages_with_ids(self) -> None:
+    def test_quotes_supported_group_messages_with_ids(self) -> None:
         self.assertTrue(
             should_quote_group_reply(
                 platform_name="aiocqhttp",
@@ -50,7 +50,7 @@ class ReplyPercentTests(unittest.TestCase):
                 message_id="123",
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             should_quote_group_reply(
                 platform_name="qq_official",
                 is_group_chat=True,
@@ -62,6 +62,13 @@ class ReplyPercentTests(unittest.TestCase):
                 platform_name="aiocqhttp",
                 is_group_chat=False,
                 message_id="123",
+            )
+        )
+        self.assertFalse(
+            should_quote_group_reply(
+                platform_name="qq_official",
+                is_group_chat=True,
+                message_id="",
             )
         )
 

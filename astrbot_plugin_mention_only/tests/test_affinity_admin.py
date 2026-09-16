@@ -52,11 +52,17 @@ class _FakeAt:
 class _FakeReply:
     def __init__(self, sender_id: str = "", **_kwargs) -> None:
         self.sender_id = sender_id
+        self.id = _kwargs.get("id", "")
 
 
 class _FakePlain:
     def __init__(self, text: str) -> None:
         self.text = text
+
+
+class _FakeChain:
+    def __init__(self, chain) -> None:
+        self.chain = chain
 
 
 class _FakeEvent:
@@ -140,7 +146,7 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
         core = types.ModuleType("astrbot.core")
         message = types.ModuleType("astrbot.core.message")
         event_result = types.ModuleType("astrbot.core.message.message_event_result")
-        event_result.MessageChain = list
+        event_result.MessageChain = _FakeChain
         sys.modules.update(
             {
                 "astrbot": astrbot,
@@ -250,6 +256,66 @@ class AffinityAdminTests(unittest.IsolatedAsyncioTestCase):
         event.get_self_id = lambda: ""
         event._messages = [_FakeReply("")]
         self.assertFalse(self.plugin._targets_bot(event))
+
+    async def test_official_group_chat_response_carries_native_reference(self) -> None:
+        event = _FakeEvent(sender_id="member")
+        event.get_platform_name = lambda: "qq_official"
+        event.message_obj.message_id = "message-a"
+
+        async def send(send_func, payload, plain_text, stream=None):
+            return payload
+
+        event._send_with_markdown_fallback = send
+        response = types.SimpleNamespace(result_chain=None, completion_text="完整回复")
+        await self.plugin.quote_group_reply_target(event, response)
+        self.assertEqual(response.result_chain.chain[0].id, "message-a")
+        self.assertEqual(response.result_chain.chain[1].text, "完整回复")
+        payload = await event._send_with_markdown_fallback(None, {}, "完整回复")
+        self.assertEqual(payload["message_reference"]["message_id"], "message-a")
+
+    async def test_official_reference_is_bound_before_streamed_response(self) -> None:
+        self.plugin.config["hidden_affinity_enabled"] = False
+        event = _FakeEvent(sender_id="member")
+        event.get_platform_name = lambda: "qq_official"
+        event.get_extra = lambda _key: None
+        event._messages = [_FakeAt("qq_official")]
+        event.message_obj.message_id = "message-a"
+
+        async def send(send_func, payload, plain_text, stream=None):
+            return payload
+
+        event._send_with_markdown_fallback = send
+        request = types.SimpleNamespace(system_prompt="", contexts=[])
+        await self.plugin.require_direct_mention(event, request)
+        payload = await event._send_with_markdown_fallback(None, {}, "完整回复")
+        self.assertEqual(payload["message_reference"]["message_id"], "message-a")
+
+    async def test_official_private_response_is_not_quoted(self) -> None:
+        event = _FakeEvent(sender_id="member", group_id="")
+        event.get_platform_name = lambda: "qq_official"
+        event.message_obj.message_id = "message-a"
+        response = types.SimpleNamespace(result_chain=None, completion_text="完整回复")
+        await self.plugin.quote_group_reply_target(event, response)
+        self.assertIsNone(response.result_chain)
+
+    async def test_unsupported_official_adapter_shows_sender_name(self) -> None:
+        event = _FakeEvent(sender_id="member")
+        event.get_platform_name = lambda: "qq_official"
+        event.get_sender_name = lambda: "Keita"
+        event.message_obj.message_id = "message-a"
+        response = types.SimpleNamespace(result_chain=None, completion_text="完整回复")
+        await self.plugin.quote_group_reply_target(event, response)
+        self.assertEqual(response.result_chain.chain[0].text, "回复 Keita：\n")
+        self.assertEqual(response.result_chain.chain[1].text, "完整回复")
+
+    async def test_disabled_quotes_leave_official_response_unchanged(self) -> None:
+        self.plugin.config["quote_group_replies"] = False
+        event = _FakeEvent(sender_id="member")
+        event.get_platform_name = lambda: "qq_official"
+        event.message_obj.message_id = "message-a"
+        response = types.SimpleNamespace(result_chain=None, completion_text="完整回复")
+        await self.plugin.quote_group_reply_target(event, response)
+        self.assertIsNone(response.result_chain)
 
 
 if __name__ == "__main__":

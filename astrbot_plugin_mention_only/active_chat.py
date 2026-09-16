@@ -68,7 +68,7 @@ def should_quote_group_reply(
     message_id: object,
 ) -> bool:
     return (
-        str(platform_name or "").strip().casefold() == "aiocqhttp"
+        str(platform_name or "").strip().casefold() in SUPPORTED_PLATFORMS
         and bool(is_group_chat)
         and bool(str(message_id or "").strip())
     )

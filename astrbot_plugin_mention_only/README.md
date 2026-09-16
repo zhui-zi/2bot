@@ -2,7 +2,7 @@
 
 AstrBot request gate and optional active participation for QQ Official and SnowLuma group conversations.
 
-Every group model turn receives a current-member identity prefix from the group-memory plugin. SnowLuma replies also quote the triggering OneBot message, while QQ Official already binds passive replies to the triggering message ID. This keeps concurrent member conversations attached to the correct sender.
+Every group model turn receives a current-member identity prefix from the group-memory plugin. With `quote_group_replies` enabled, SnowLuma and QQ Official chat replies quote the triggering message. QQ Official uses plain group messages with an explicit `message_reference`; adapters without reference support show the sender's name. Concurrent replies keep separate message references.
 
 The `natural_chat_style` option is enabled by default. It adds a compact system rule that makes casual replies follow the other person's length and energy, joins clear jokes and playful exaggeration with a light response, avoids unsolicited summaries and advice, and keeps detailed structure for questions that actually need it. Humor follows current-message signals, never replaces a useful answer, and does not force memes or shared in-jokes. The rule also keeps conflict temperature low: ambiguous wording receives a benign reading, disagreement targets the point instead of the person, and insults, contempt, retaliatory sarcasm, public shaming, and angry lectures are prohibited. Boundaries stay brief and conversational. The rule is added once per request and does not enter stored conversation history.
 

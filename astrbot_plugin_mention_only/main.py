@@ -52,13 +52,14 @@ from .chat_style import (
     forget_expired_negative_contexts,
     should_apply_natural_style,
 )
+from .qq_reply import bind_group_reference
 
 
 @register(
     "mention_only_chat",
     "keita",
     "Gates direct chat and keeps QQ replies conversational and relational.",
-    "1.15.2",
+    "1.15.3",
 )
 class MentionOnlyChat(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -176,6 +177,17 @@ class MentionOnlyChat(Star):
             return
 
         platform_name = event.get_platform_name()
+        message_id = str(getattr(event.message_obj, "message_id", "") or "").strip()
+        if (
+            str(platform_name or "").strip().casefold() == "qq_official"
+            and self.config.get("quote_group_replies", True)
+            and should_quote_group_reply(
+                platform_name=platform_name,
+                is_group_chat=bool(event.get_group_id()),
+                message_id=message_id,
+            )
+        ):
+            bind_group_reference(event, message_id)
         adult_mode = event.get_extra("_nsfw_mode_active") == "adult_content"
         is_bot_author = resolve_event_permission(event).level == PERMISSION_BOT_AUTHOR
 
@@ -242,6 +254,9 @@ class MentionOnlyChat(Star):
             sender_id=str(event.get_sender_id() or ""),
             sender_nickname=self._sender_name(event),
         )
+        if str(event.get_platform_name() or "").strip().casefold() == "qq_official":
+            if not bind_group_reference(event, message_id):
+                reply = Plain(f"回复 {self._sender_name(event)}：\n")
         if response.result_chain:
             if not any(
                 isinstance(component, Reply)
