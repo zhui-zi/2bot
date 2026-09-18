@@ -1,6 +1,12 @@
 # Unified Front Guard
 
-This AstrBot plugin is the single front layer for user-facing natural commands, harassment handling, and prompt-injection defense. High-confidence local rules run first. Only messages containing feature or security signals use the `deepseek_v4_flash` classifier by default; ordinary chat proceeds directly to the visible chat model. Repeated classifications are cached by message hash.
+This AstrBot plugin classifies every non-empty private or bot-directed message with `deepseek-flash` before natural-command routing. Group messages addressed to other users are excluded. Explicit commands retain AstrBot's normal dispatch after classification. A chat result or low command confidence does not trigger local keyword routing. Local command rules provide a fallback when classification is disabled or both providers fail.
+
+Each classification includes the current session's complete enabled command catalog, plugin capabilities, command aliases, parameter signatures, feature usage, and permission requirements. Disabled plugins and commands are excluded. Known ordinary functions can be routed naturally; administrator and unreviewed commands require explicit syntax. Command handlers enforce their existing permissions and session state again before execution.
+
+The catalog covers public links, weather, tarot, daily pigs, FF14 server status, official news, maintenance, prices, FFLogs, subscriptions, group memory status, and Tataru features. Verified bot quotes accompany the current message as untrusted context for follow-up corrections.
+
+`classifier_enabled` defaults to `true`. Every directed message is classified regardless of any saved `classify_ordinary_chat` value. `cache_ttl_seconds` defaults to `0`, which sends each message to Flash. A positive value enables caching scoped to the sender, session, quote, providers, and current catalog. Existing installations should set the cache lifetime to `0` for fresh classification on every message.
 
 Harassment and prompt-injection blocks use the same Flash provider to generate a short, varied boundary-setting reply with thinking disabled and no tools. Flash requests retry through the configured official provider when the primary provider fails or returns invalid output. Harassment replies stay calm, avoid retaliatory sarcasm or scolding, and invite a topic change. The original message is passed only as untrusted data. A fixed safe response is used only when both providers fail.
 
@@ -16,9 +22,9 @@ Sponsorship questions are routed to the public Afdian reply exposed by the help 
 
 Daily-pig requests are routed to the installed `/今日小猪` command and preserve its per-user daily result.
 
-Weather requests preserve the location and forecast day and route directly to `/weather` without an LLM.
+Weather requests preserve the location and forecast day and route to `/weather` after classification.
 
-Compact market queries such as `脚夫鸭价格` route directly to `/价格 脚夫鸭` without an LLM. Generic discussion such as `这个价格合理吗` remains ordinary chat.
+Compact market queries such as `脚夫鸭价格` can route to `/价格 脚夫鸭`. Generic discussion such as `这个价格合理吗` remains ordinary chat.
 
 Housing subscription requests preserve CN server names and route server, size, and personal, free-company, or shared-plot filters to `/ff14push house`. Group-scoped wording and a leading plain-text bot mention are normalized before routing.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
+import json
 import time
 from collections import OrderedDict
 from collections.abc import AsyncGenerator
@@ -10,18 +11,23 @@ from typing import Any
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.message_components import Reply
+from astrbot.api.message_components import At, Reply
 from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star, register
 from astrbot.core.platform.astr_message_event import AstrMessageEvent as CoreEvent
 from astrbot.core.star.filter.command import CommandFilter
+from astrbot.core.star.filter.command_group import CommandGroupFilter
 from astrbot.core.star.filter.permission import PermissionTypeFilter
 from astrbot.core.star.session_plugin_manager import SessionPluginManager
 from astrbot.core.star.star import star_map
-from astrbot.core.star.star_handler import EventType, StarHandlerMetadata, star_handlers_registry
+from astrbot.core.star.star_handler import (
+    EventType,
+    StarHandlerMetadata,
+    star_handlers_registry,
+)
 
 from .front_core import (
-    CLASSIFIER_SYSTEM_PROMPT,
+    COMMAND_GUIDANCE,
     ROUTED_COMMANDS,
     SECURITY_BOUNDARY,
     SECURITY_REPLY_FALLBACKS,
@@ -30,6 +36,7 @@ from .front_core import (
     CommandIntent,
     FrontClassification,
     build_classifier_prompt,
+    build_classifier_system_prompt,
     build_security_reply_prompt,
     classification_intent,
     clean_security_reply,
@@ -42,19 +49,18 @@ from .front_core import (
     match_reply_correction,
     parse_classifier_output,
     protect_housing_intent,
-    should_use_flash_classifier,
 )
 
 
-DEFAULT_FLASH_PROVIDER_ID = "deepseek_v4_flash"
-DEFAULT_FLASH_FALLBACK_PROVIDER_ID = "deepseek_v4_flash_official"
+DEFAULT_FLASH_PROVIDER_ID = "deepseek-flash"
+DEFAULT_FLASH_FALLBACK_PROVIDER_ID = "deepseek-flash-official"
 
 
 @register(
     "unified_front_guard",
     "keita",
     "Routes user features and protects model requests through a Flash front layer.",
-    "1.4.4",
+    "1.5.0",
 )
 class UnifiedFrontGuard(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -92,17 +98,32 @@ class UnifiedFrontGuard(Star):
         )
         if missing:
             logger.warning("Front command targets unavailable: %s", ", ".join(missing))
-        if self._classifier_enabled() and not self.context.get_provider_by_id(provider_id):
+        if self._classifier_enabled() and not self.context.get_provider_by_id(
+            provider_id
+        ):
             logger.warning("Front Flash provider is unavailable: %s", provider_id)
 
-    @filter.event_message_type(filter.EventMessageType.ALL, priority=900)
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=910)
     async def process_front_layer(self, event: AstrMessageEvent):
         message = str(event.get_message_str() or "").strip()
         if not message:
             return
-        is_direct = bool(event.is_private_chat() or event.is_at_or_wake_command)
+        is_direct = bool(
+            event.is_private_chat()
+            or event.is_at_or_wake_command
+            or any(
+                isinstance(component, At)
+                and str(component.qq) == str(event.get_self_id())
+                for component in event.get_messages()
+            )
+        )
         if not is_direct:
             return
+        quoted_message = self._quoted_bot_message(event)
+        classification = None
+        if self._classifier_enabled():
+            classification = await self._classify(event, message, quoted_message)
+        event.set_extra("_front_guard_checked", "flash" if classification else "local")
         harassment_bypassed = self._harassment_bypassed(event)
 
         if not harassment_bypassed and is_harassing_message(message):
@@ -124,36 +145,26 @@ class UnifiedFrontGuard(Star):
             yield event.plain_result(SYSTEM_COMMAND_REPLY)
             event.stop_event()
             return
+        block_reply = await self._classified_block_reply(
+            classification,
+            message,
+            harassment_bypassed=harassment_bypassed,
+        )
+        if block_reply:
+            yield event.plain_result(block_reply)
+            event.stop_event()
+            return
         if is_pvp_gameplay_question(message):
-            event.set_extra("_front_guard_checked", "local")
             return
 
-        intent = match_reply_correction(message, self._quoted_bot_message(event))
-        if intent is None:
-            intent = match_natural_command(message)
-        classification: FrontClassification | None = None
-        use_classifier = self._classify_ordinary_chat() or should_use_flash_classifier(
-            message
-        )
-        if intent is None and self._classifier_enabled() and use_classifier:
-            classification = await self._classify(message)
-            block_reply = await self._classified_block_reply(
-                classification,
-                message,
-                harassment_bypassed=harassment_bypassed,
-            )
-            if block_reply:
-                yield event.plain_result(block_reply)
-                event.stop_event()
-                return
-            intent = classification_intent(
-                classification,
-                self._command_confidence(),
-            )
-
+        if classification is None:
+            intent = match_reply_correction(message, quoted_message)
+            if intent is None:
+                intent = match_natural_command(message)
+        else:
+            intent = classification_intent(classification, self._command_confidence())
         intent = protect_housing_intent(message, intent)
 
-        event.set_extra("_front_guard_checked", "flash" if classification else "local")
         if intent is None:
             return
         async for result in self._dispatch(event, intent):
@@ -166,7 +177,7 @@ class UnifiedFrontGuard(Star):
             if not isinstance(component, Reply):
                 continue
             sender_id = str(getattr(component, "sender_id", "") or "")
-            if self_id and sender_id and sender_id != self_id:
+            if not self_id or sender_id != self_id:
                 continue
             return str(getattr(component, "message_str", "") or "")
         return ""
@@ -233,41 +244,160 @@ class UnifiedFrontGuard(Star):
             if reply:
                 logger.info("Front Flash generated security reply kind=%s.", kind)
                 return reply
-            logger.warning("Front Flash returned an empty security reply kind=%s.", kind)
+            logger.warning(
+                "Front Flash returned an empty security reply kind=%s.", kind
+            )
         return fallback
 
-    async def _classify(self, message: str) -> FrontClassification | None:
-        cache_key = hashlib.sha256(message.encode("utf-8")).hexdigest()
+    async def _feature_catalog(self, event: AstrMessageEvent) -> list[dict[str, Any]]:
+        enabled_plugins = {}
+        for module_path, plugin in list(star_map.items()):
+            if not plugin.activated or not plugin.name:
+                continue
+            if (
+                event.plugins_name is not None
+                and event.plugins_name != ["*"]
+                and plugin.name not in event.plugins_name
+                and not plugin.reserved
+            ):
+                continue
+            if await SessionPluginManager.is_plugin_enabled_for_session(
+                event.unified_msg_origin,
+                plugin.name,
+            ):
+                enabled_plugins[module_path] = plugin
+
+        catalog: list[dict[str, Any]] = []
+        for plugin in enabled_plugins.values():
+            catalog.append(
+                {
+                    "plugin": plugin.name,
+                    "description": str(plugin.desc or ""),
+                }
+            )
+        for handler in star_handlers_registry.get_handlers_by_event_type(
+            EventType.AdapterMessageEvent,
+            plugins_name=event.plugins_name,
+        ):
+            if (
+                not handler.enabled
+                or handler.handler_module_path not in enabled_plugins
+            ):
+                continue
+            for command_filter in handler.event_filters:
+                if not isinstance(command_filter, (CommandFilter, CommandGroupFilter)):
+                    continue
+                names = command_filter.get_complete_command_names()
+                if isinstance(command_filter, CommandFilter):
+                    original = getattr(
+                        command_filter,
+                        "_original_command_name",
+                        command_filter.command_name,
+                    )
+                    parent = (command_filter.parent_command_names or [""])[0]
+                    canonical = f"{parent} {original}".strip()
+                    parameters = command_filter.print_types()
+                else:
+                    original = getattr(
+                        command_filter,
+                        "_original_group_name",
+                        command_filter.group_name,
+                    )
+                    parent = names[0].rpartition(" ")[0]
+                    canonical = f"{parent} {original}".strip()
+                    parameters = "See registered subcommands."
+                permissions = [
+                    str(getattr(item.permission_type, "name", item.permission_type))
+                    for item in handler.event_filters
+                    if isinstance(item, PermissionTypeFilter)
+                ]
+                catalog.append(
+                    {
+                        "command": canonical,
+                        "names": sorted(set(names)),
+                        "plugin": enabled_plugins[handler.handler_module_path].name,
+                        "description": str(handler.desc or ""),
+                        "parameters": parameters,
+                        "usage": COMMAND_GUIDANCE.get(
+                            canonical, "Explicit command only."
+                        ),
+                        "permissions": permissions,
+                        "natural_language": canonical in ROUTED_COMMANDS,
+                    }
+                )
+        return sorted(
+            catalog, key=lambda item: (item["plugin"], item.get("command", ""))
+        )
+
+    async def _classify(
+        self,
+        event: AstrMessageEvent,
+        message: str,
+        quoted_message: str = "",
+    ) -> FrontClassification | None:
+        try:
+            catalog = await self._feature_catalog(event)
+        except Exception as exc:
+            logger.warning("Front feature catalog failed error=%s.", type(exc).__name__)
+            return None
+        available = frozenset(
+            item["command"] for item in catalog if item.get("natural_language")
+        )
+        prompt = build_classifier_prompt(
+            message,
+            quoted_message,
+            chat_type="private" if event.is_private_chat() else "group",
+        )
+        system_prompt = build_classifier_system_prompt(catalog)
+        cache_key = hashlib.sha256(
+            json.dumps(
+                [
+                    event.unified_msg_origin,
+                    str(event.get_sender_id()),
+                    self._provider_ids(),
+                    prompt,
+                    system_prompt,
+                ],
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
         now = time.monotonic()
+        ttl = self._cache_ttl()
         async with self._cache_lock:
             cached = self._classification_cache.get(cache_key)
-            if cached and now - cached[0] <= self._cache_ttl():
+            if ttl > 0 and cached and now - cached[0] <= ttl:
                 self._classification_cache.move_to_end(cache_key)
                 return cached[1]
 
         classification = None
         async for response in self._flash_responses(
             timeout=self._classifier_timeout(),
-            prompt=build_classifier_prompt(message),
-            system_prompt=CLASSIFIER_SYSTEM_PROMPT,
+            prompt=prompt,
+            system_prompt=system_prompt,
             contexts=[],
             temperature=0,
-            max_tokens=180,
+            max_tokens=512,
             thinking={"type": "disabled"},
             response_format={"type": "json_object"},
         ):
-            classification = parse_classifier_output(response.completion_text or "")
+            classification = parse_classifier_output(
+                response.completion_text or "", available
+            )
             if classification is not None:
                 break
             logger.warning("Front Flash classifier returned invalid output.")
         if classification is None:
             return None
 
-        async with self._cache_lock:
-            self._classification_cache[cache_key] = (now, classification)
-            self._classification_cache.move_to_end(cache_key)
-            while len(self._classification_cache) > self._cache_limit():
-                self._classification_cache.popitem(last=False)
+        if ttl > 0:
+            async with self._cache_lock:
+                self._classification_cache[cache_key] = (
+                    time.monotonic(),
+                    classification,
+                )
+                self._classification_cache.move_to_end(cache_key)
+                while len(self._classification_cache) > self._cache_limit():
+                    self._classification_cache.popitem(last=False)
         logger.info(
             "Front Flash classification kind=%s command=%s confidence=%.2f.",
             classification.kind,
@@ -362,7 +492,9 @@ class UnifiedFrontGuard(Star):
                     "_original_command_name",
                     event_filter.command_name,
                 )
-                if original == intent.command:
+                if original == intent.command and not any(
+                    event_filter.parent_command_names
+                ):
                     return handler, event_filter
         return None
 
@@ -370,7 +502,7 @@ class UnifiedFrontGuard(Star):
     def _has_explicit_command(event: AstrMessageEvent) -> bool:
         for handler in event.get_extra("activated_handlers", []) or []:
             if any(
-                isinstance(event_filter, CommandFilter)
+                isinstance(event_filter, (CommandFilter, CommandGroupFilter))
                 for event_filter in handler.event_filters
             ):
                 return True
@@ -438,9 +570,6 @@ class UnifiedFrontGuard(Star):
     def _classifier_enabled(self) -> bool:
         return bool(self.config.get("classifier_enabled", True))
 
-    def _classify_ordinary_chat(self) -> bool:
-        return bool(self.config.get("classify_ordinary_chat", False))
-
     def _harassment_bypassed(self, event: AstrMessageEvent) -> bool:
         return event.get_extra("_nsfw_mode_active") == "adult_content" or (
             is_harassment_bypassed_group(
@@ -472,7 +601,7 @@ class UnifiedFrontGuard(Star):
         return max(32, min(256, value))
 
     def _cache_ttl(self) -> float:
-        return self._bounded_float("cache_ttl_seconds", 300.0, 0.0, 3600.0)
+        return self._bounded_float("cache_ttl_seconds", 0.0, 0.0, 3600.0)
 
     def _cache_limit(self) -> int:
         try:

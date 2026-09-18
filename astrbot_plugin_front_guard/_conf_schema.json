@@ -1,13 +1,8 @@
 {
   "classifier_enabled": {
-    "description": "Use the Flash model for ambiguous feature intent and security classification.",
+    "description": "Classify every private or bot-directed text message with DeepSeek Flash before routing.",
     "type": "bool",
     "default": true
-  },
-  "classify_ordinary_chat": {
-    "description": "Send ordinary chat through the Flash classifier before the visible chat model.",
-    "type": "bool",
-    "default": false
   },
   "harassment_bypass_group_ids": {
     "description": "Group IDs that bypass harassment detection while retaining command routing and prompt-injection defense.",
@@ -17,12 +12,12 @@
   "flash_provider_id": {
     "description": "AstrBot provider ID used by the front classifier.",
     "type": "string",
-    "default": "deepseek_v4_flash"
+    "default": "deepseek-flash"
   },
   "flash_fallback_provider_id": {
     "description": "AstrBot provider ID used when the primary Flash provider fails.",
     "type": "string",
-    "default": "deepseek_v4_flash_official"
+    "default": "deepseek-flash-official"
   },
   "classifier_timeout_seconds": {
     "description": "Maximum time allowed for a Flash classification request.",
@@ -55,9 +50,9 @@
     "default": 96
   },
   "cache_ttl_seconds": {
-    "description": "Classification cache lifetime for repeated identical messages.",
+    "description": "Optional classification cache lifetime, scoped to sender, session, quote, provider, and feature catalog. Zero sends every message to Flash.",
     "type": "float",
-    "default": 300
+    "default": 0
   },
   "cache_max_entries": {
     "description": "Maximum number of hashed classification cache entries.",
